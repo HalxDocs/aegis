@@ -1,6 +1,6 @@
 GO ?= go
 
-.PHONY: all build fmt fmt-check vet test race check replay demo clean
+.PHONY: all build fmt fmt-check vet test race check cover replay demo clean
 
 all: check
 
@@ -24,6 +24,10 @@ test:
 
 race:
 	$(GO) test -race ./...
+
+cover:
+	$(GO) test -coverprofile=coverage.out ./...
+	@$(GO) tool cover -func=coverage.out | tail -1
 
 check: fmt-check vet build test race
 
