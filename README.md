@@ -6,15 +6,38 @@ Aegis is a platform for reasoning about failure in distributed systems. Every re
 observable evidence, constrained by safety rules, and verified afterwards.
 
 Milestone 1 — the *failure lab* — is a deterministic discrete-event simulator. It models three nodes on a virtual
-clock, exchanges heartbeats over a networked message path, crashes one node, and shows that the surviving observers
-only *suspect* the failure after their own heartbeat timeouts. It does not recover anything yet.
+clock, exchanges heartbeats over links with different latencies, crashes one node, and shows that the surviving
+observers only *suspect* the failure after their own heartbeat timeouts. It does not recover anything yet.
 
 The simulator owns ground truth. Observers never see it.
 
+## What one run shows
+
+```
+$ go run ./cmd/aegis run --scenario node-crash --format table
+```
+
+| t | event |
+| --- | --- |
+| 0 ms | A, B, C start |
+| 100 ms | B sends heartbeat round 1 to A and C |
+| 120 ms / 125 ms | A / C receive it |
+| 200 ms | B sends round 2 |
+| **215 ms** | **B crashes** |
+| 220 ms / 225 ms | round 2 still arrives — it was already on the wire |
+| 570 ms / 575 ms | A / C stop trusting B |
+| 1200 ms | horizon: B is crashed, both observers still suspect it |
+
+Suspicion latency is 355 ms, not the configured 350 ms, because the last evidence arrived 5 ms after the crash.
+That gap is the milestone: a fact and a belief about that fact are different things, and the log records both.
+
 ## Status
 
-Milestone 1 is under construction. See [doc_m1.md](doc_m1.md) for the engineering decisions, the failure modes that
-were considered, and the verification evidence.
+Milestone 1 is complete. See [doc_m1.md](doc_m1.md) for every engineering decision, the risks considered, the
+drift between the plan and the code, and the verification evidence behind each claim.
+
+Deliberately absent from M1: recovery, diagnosis, network partitions, scenario files, and any real concurrency
+inside the simulation. A recovery loop that guesses would be worse than no recovery loop.
 
 ## Requirements
 
@@ -25,22 +48,30 @@ were considered, and the verification evidence.
 
 ```bash
 make check                                                      # gofmt, vet, build, tests, race detector
-go run ./cmd/aegis run --scenario node-crash --format table      # human-readable event log
+make replay                                                     # same scenario twice, byte-for-byte
+make demo                                                       # human-readable event log
+
 go run ./cmd/aegis run --scenario node-crash --format jsonl      # canonical machine-readable log
+go run ./cmd/aegis run --scenario node-crash --seed 7            # seed is an input, not a global
 ```
+
+The JSONL log is the canonical artifact: one event per line, virtual timestamps only, sequence numbers assigned by
+the recorder. The table view is rendered from those events and is never a second source of truth.
 
 ## Layout
 
 ```
-cmd/aegis           command-line entry point
-internal/domain     core vocabulary: virtual time, ids, node and belief states, events
-internal/sim        virtual clock, deterministic scheduler, network, nodes, engine
-internal/detector   observer-side failure detection from heartbeat timeouts
+cmd/aegis               command-line entry point and table rendering
+internal/domain         core vocabulary: virtual time, ids, node and belief states, events
+internal/sim            virtual clock, deterministic scheduler, network, nodes, engine
+internal/detector       observer-side suspicion from heartbeat timeouts
 internal/observability  append-only event history and JSONL encoding
-internal/scenario   scenario specifications, the canonical crash fixture, the runner
-internal/cli        command-line parsing and rendering
-docs/               architecture notes and the milestone plan
+internal/scenario       scenario specification, the canonical crash fixture, the runner
+docs/                   the milestone plan
 ```
+
+The dependency rule is one-way: `cmd` and `scenario` may know every component; the simulator knows the domain; the
+detector knows only the domain, so it has no way to read ground truth.
 
 ## Licence
 
