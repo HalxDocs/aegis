@@ -160,3 +160,43 @@ func TestEngineAtSchedulesWork(t *testing.T) {
 		t.Fatalf("Now() = %d, want %d", now, tickAt(100))
 	}
 }
+
+func TestAtEndRunsAfterOrdinaryWorkAtTheSameInstant(t *testing.T) {
+	e, _ := newTestEngine(t, EngineConfig{})
+	if err := e.Start(); err != nil {
+		t.Fatal(err)
+	}
+	var order []string
+	if _, err := e.AtEnd(tickAt(10), func() { order = append(order, "deadline") }); err != nil {
+		t.Fatalf("AtEnd: %v", err)
+	}
+	if _, err := e.At(tickAt(10), func() { order = append(order, "message") }); err != nil {
+		t.Fatalf("At: %v", err)
+	}
+	if err := e.Run(tickAt(10)); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if len(order) != 2 || order[0] != "message" || order[1] != "deadline" {
+		t.Fatalf("order = %v, want [message deadline]", order)
+	}
+}
+
+func TestFaultSinkAbortsTheRunWithTheFirstFailure(t *testing.T) {
+	e, _ := newTestEngine(t, EngineConfig{})
+	if err := e.Start(); err != nil {
+		t.Fatal(err)
+	}
+	first := errors.New("component failed")
+	e.Fail(first)
+	e.Fail(errors.New("a later, less interesting failure"))
+	if err := e.Run(tickAt(10)); !errors.Is(err, first) {
+		t.Fatalf("Run error = %v, want the first fault", err)
+	}
+}
+
+func TestNegativeStepLimitFallsBackToTheDefault(t *testing.T) {
+	e, _ := newTestEngine(t, EngineConfig{StepLimit: -5})
+	if e.sched.limit != DefaultStepLimit {
+		t.Fatalf("step limit = %d, want the default %d", e.sched.limit, DefaultStepLimit)
+	}
+}
