@@ -74,7 +74,7 @@ func TestStartRejectsUnknownPeer(t *testing.T) {
 }
 
 func TestStartIsOnceOnly(t *testing.T) {
-	e, _, _, _ := canonicalEngine(t)
+	e, _, _ := canonicalEngine(t)
 	if err := e.Start(); err != nil {
 		t.Fatal(err)
 	}
@@ -97,7 +97,7 @@ func TestAddReceiverRejectsNil(t *testing.T) {
 }
 
 func TestEveryReceiverSeesEveryDeliveryInRegistrationOrder(t *testing.T) {
-	e, _, _, _ := canonicalEngine(t)
+	e, _, _ := canonicalEngine(t)
 	second := &stubReceiver{}
 	if err := e.AddReceiver(second); err != nil {
 		t.Fatal(err)
@@ -117,13 +117,6 @@ func TestEveryReceiverSeesEveryDeliveryInRegistrationOrder(t *testing.T) {
 		if first.got[i] != second.got[i] {
 			t.Fatalf("delivery %d differs between receivers: %+v and %+v", i, first.got[i], second.got[i])
 		}
-	}
-}
-
-func TestOnCrashRejectsNil(t *testing.T) {
-	e, _ := newTestEngine(t, EngineConfig{})
-	if err := e.OnCrash(nil); !errors.Is(err, ErrNilListener) {
-		t.Fatalf("error = %v, want ErrNilListener", err)
 	}
 }
 

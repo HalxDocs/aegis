@@ -8,7 +8,7 @@ import (
 )
 
 func TestNodeStartRecordsSortedStartup(t *testing.T) {
-	e, rec, _, _ := canonicalEngine(t)
+	e, rec, _ := canonicalEngine(t)
 	if err := e.Start(); err != nil {
 		t.Fatalf("Start: %v", err)
 	}
@@ -32,7 +32,7 @@ func TestNodeStartRecordsSortedStartup(t *testing.T) {
 }
 
 func TestNodeHeartbeatRoundsAndDelivery(t *testing.T) {
-	e, rec, rx, _ := canonicalEngine(t)
+	e, rec, rx := canonicalEngine(t)
 	if err := e.Start(); err != nil {
 		t.Fatal(err)
 	}
@@ -113,7 +113,7 @@ func TestNodeVisitsPeersInSortedOrder(t *testing.T) {
 }
 
 func TestCrashStopsTheNodesOwnHeartbeats(t *testing.T) {
-	e, rec, _, listener := canonicalEngine(t)
+	e, rec, _ := canonicalEngine(t)
 	if err := e.Start(); err != nil {
 		t.Fatal(err)
 	}
@@ -131,9 +131,6 @@ func TestCrashStopsTheNodesOwnHeartbeats(t *testing.T) {
 	if len(crashes) != 1 || crashes[0].Node != "B" || crashes[0].At != tickAt(150) {
 		t.Fatalf("crash events = %+v", crashes)
 	}
-	if len(listener.crashes) != 1 || listener.crashes[0] != "B" {
-		t.Fatalf("listener crashes = %v", listener.crashes)
-	}
 	state, ok := e.Truth("B")
 	if !ok || state != domain.StateCrashed {
 		t.Fatalf("ground truth for B = %q, %v", state, ok)
@@ -142,7 +139,7 @@ func TestCrashStopsTheNodesOwnHeartbeats(t *testing.T) {
 }
 
 func TestCrashIsTerminal(t *testing.T) {
-	e, _, _, _ := canonicalEngine(t)
+	e, _, _ := canonicalEngine(t)
 	if err := e.Start(); err != nil {
 		t.Fatal(err)
 	}
@@ -159,7 +156,7 @@ func TestCrashIsTerminal(t *testing.T) {
 }
 
 func TestCrashedNodeRejectsFurtherWork(t *testing.T) {
-	e, _, _, _ := canonicalEngine(t)
+	e, _, _ := canonicalEngine(t)
 	if err := e.Start(); err != nil {
 		t.Fatal(err)
 	}

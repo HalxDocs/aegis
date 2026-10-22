@@ -23,9 +23,6 @@ var (
 
 	// ErrAlreadyStarted is returned when a run is started twice.
 	ErrAlreadyStarted = errors.New("simulator has already started")
-
-	// ErrNilListener is returned when an empty crash listener is registered.
-	ErrNilListener = errors.New("nil crash listener")
 )
 
 // EventRecorder is the append-only history the simulator writes to. It is
@@ -44,12 +41,6 @@ type Receiver interface {
 	HeartbeatReceived(at domain.Tick, from, to domain.NodeID, round uint64) error
 }
 
-// CrashListener is told when ground truth changes. It lets a component that
-// keeps per-observer state mirror the lifecycle without reading node state.
-type CrashListener interface {
-	NodeCrashed(at domain.Tick, id domain.NodeID) error
-}
-
 // EngineConfig configures a simulator run.
 //
 // Seed drives every random decision. StepLimit bounds executed tasks; zero
@@ -62,15 +53,14 @@ type EngineConfig struct {
 
 // Engine owns virtual time, the event queue, the network and ground truth.
 type Engine struct {
-	rec            EventRecorder
-	sched          *scheduler
-	net            *network
-	nodes          map[domain.NodeID]*node
-	order          []domain.NodeID
-	receivers      []Receiver
-	crashListeners []CrashListener
-	err            error
-	started        bool
+	rec       EventRecorder
+	sched     *scheduler
+	net       *network
+	nodes     map[domain.NodeID]*node
+	order     []domain.NodeID
+	receivers []Receiver
+	err       error
+	started   bool
 }
 
 // Engine is usable anywhere a clock or a scheduler is expected. The detector
@@ -131,15 +121,6 @@ func (e *Engine) AddReceiver(r Receiver) error {
 		return ErrNoReceiver
 	}
 	e.receivers = append(e.receivers, r)
-	return nil
-}
-
-// OnCrash registers a listener for ground-truth changes.
-func (e *Engine) OnCrash(l CrashListener) error {
-	if l == nil {
-		return ErrNilListener
-	}
-	e.crashListeners = append(e.crashListeners, l)
 	return nil
 }
 
@@ -211,13 +192,4 @@ func (e *Engine) deliver(at domain.Tick, msg Message) {
 			return
 		}
 	}
-}
-
-func (e *Engine) notifyCrash(at domain.Tick, id domain.NodeID) error {
-	for _, listener := range e.crashListeners {
-		if err := listener.NodeCrashed(at, id); err != nil {
-			return fmt.Errorf("crash listener: %w", err)
-		}
-	}
-	return nil
 }

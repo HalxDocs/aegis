@@ -119,7 +119,9 @@ func (n *node) beat(at domain.Tick) error {
 //
 // Messages already inside the network keep travelling: the network has no way
 // to retract what it accepted, and pretending otherwise would remove exactly
-// the subtle window this milestone exists to show.
+// the subtle window this milestone exists to show. Nothing outside the
+// simulator is told about the crash, because an observer that was told would no
+// longer be observing.
 func (n *node) crash(at domain.Tick) error {
 	next, err := n.state.TransitionTo(domain.StateCrashed)
 	if err != nil {
@@ -132,5 +134,5 @@ func (n *node) crash(at domain.Tick) error {
 	if err := n.eng.record(domain.Event{At: at, Kind: domain.KindNodeCrashed, Node: n.id}); err != nil {
 		return fmt.Errorf("node %s: record crash: %w", n.id, err)
 	}
-	return n.eng.notifyCrash(at, n.id)
+	return nil
 }

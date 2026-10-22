@@ -8,7 +8,7 @@ import (
 )
 
 func TestRunAdvancesClockToHorizon(t *testing.T) {
-	e, _, _, _ := canonicalEngine(t)
+	e, _, _ := canonicalEngine(t)
 	if err := e.Start(); err != nil {
 		t.Fatal(err)
 	}
@@ -28,7 +28,7 @@ func TestRunRequiresStart(t *testing.T) {
 }
 
 func TestRunRejectsHorizonInThePast(t *testing.T) {
-	e, _, _, _ := canonicalEngine(t)
+	e, _, _ := canonicalEngine(t)
 	if err := e.Start(); err != nil {
 		t.Fatal(err)
 	}
@@ -42,24 +42,9 @@ func TestRunRejectsHorizonInThePast(t *testing.T) {
 
 func TestRunPropagatesReceiverErrors(t *testing.T) {
 	boom := errors.New("observer exploded")
-	e, _, rx, _ := canonicalEngine(t)
+	e, _, rx := canonicalEngine(t)
 	rx.err = boom
 	if err := e.Start(); err != nil {
-		t.Fatal(err)
-	}
-	if err := e.Run(tickAt(500)); !errors.Is(err, boom) {
-		t.Fatalf("error = %v, want %v", err, boom)
-	}
-}
-
-func TestRunPropagatesCrashListenerErrors(t *testing.T) {
-	boom := errors.New("listener exploded")
-	e, _, _, listener := canonicalEngine(t)
-	listener.err = boom
-	if err := e.Start(); err != nil {
-		t.Fatal(err)
-	}
-	if err := e.CrashAt(tickAt(150), "B"); err != nil {
 		t.Fatal(err)
 	}
 	if err := e.Run(tickAt(500)); !errors.Is(err, boom) {
@@ -113,7 +98,7 @@ func TestRunEnforcesStepLimit(t *testing.T) {
 }
 
 func TestCrashAtRejectsUnknownNode(t *testing.T) {
-	e, _, _, _ := canonicalEngine(t)
+	e, _, _ := canonicalEngine(t)
 	if err := e.Start(); err != nil {
 		t.Fatal(err)
 	}
@@ -123,7 +108,7 @@ func TestCrashAtRejectsUnknownNode(t *testing.T) {
 }
 
 func TestCrashAtRejectsThePast(t *testing.T) {
-	e, _, _, _ := canonicalEngine(t)
+	e, _, _ := canonicalEngine(t)
 	if err := e.Start(); err != nil {
 		t.Fatal(err)
 	}
@@ -136,7 +121,7 @@ func TestCrashAtRejectsThePast(t *testing.T) {
 }
 
 func TestCrashFiresAtTheScheduledInstant(t *testing.T) {
-	e, rec, _, _ := canonicalEngine(t)
+	e, rec, _ := canonicalEngine(t)
 	if err := e.Start(); err != nil {
 		t.Fatal(err)
 	}

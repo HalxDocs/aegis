@@ -65,19 +65,6 @@ func (r *stubReceiver) HeartbeatReceived(at domain.Tick, from, to domain.NodeID,
 	return nil
 }
 
-type recordingListener struct {
-	crashes []domain.NodeID
-	err     error
-}
-
-func (l *recordingListener) NodeCrashed(at domain.Tick, id domain.NodeID) error {
-	if l.err != nil {
-		return l.err
-	}
-	l.crashes = append(l.crashes, id)
-	return nil
-}
-
 func newTestEngine(t *testing.T, cfg EngineConfig) (*Engine, *stubRecorder) {
 	t.Helper()
 	rec, ok := cfg.Recorder.(*stubRecorder)
@@ -94,7 +81,7 @@ func newTestEngine(t *testing.T, cfg EngineConfig) (*Engine, *stubRecorder) {
 
 // canonicalEngine builds the Milestone 1 cluster: three nodes, B heartbeating
 // to A and C over links with different latencies.
-func canonicalEngine(t *testing.T) (*Engine, *stubRecorder, *stubReceiver, *recordingListener) {
+func canonicalEngine(t *testing.T) (*Engine, *stubRecorder, *stubReceiver) {
 	t.Helper()
 	e, rec := newTestEngine(t, EngineConfig{Seed: 1})
 
@@ -122,9 +109,5 @@ func canonicalEngine(t *testing.T) (*Engine, *stubRecorder, *stubReceiver, *reco
 	if err := e.AddReceiver(rx); err != nil {
 		t.Fatalf("AddReceiver: %v", err)
 	}
-	lis := &recordingListener{}
-	if err := e.OnCrash(lis); err != nil {
-		t.Fatalf("OnCrash: %v", err)
-	}
-	return e, rec, rx, lis
+	return e, rec, rx
 }
