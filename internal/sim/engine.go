@@ -175,6 +175,11 @@ func (e *Engine) Start() error {
 
 func (e *Engine) record(ev domain.Event) error { return e.rec.Record(ev) }
 
+// Fail records err as the run's first fault. Components that schedule their own
+// work report failures here, because a scheduled callback has no caller to
+// return an error to and silently losing a write would make the log lie.
+func (e *Engine) Fail(err error) { e.fail(err) }
+
 // fail keeps the first error raised inside a scheduled task. Tasks return
 // nothing, so the run loop is the only place an error can be reported without
 // stopping the queue mid-step and losing ordering information.
