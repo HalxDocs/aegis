@@ -143,6 +143,59 @@ func TestSchedulerEnforcesStepLimit(t *testing.T) {
 	}
 }
 
+func TestSchedulerRunsOrdinaryWorkBeforeEndOfInstantWork(t *testing.T) {
+	s := newTestScheduler(t)
+	var order []string
+
+	// The ordinary work is registered first here, and the end-of-instant work
+	// first in the next case: class ordering must hold either way, so the
+	// result never depends on which timer was armed first.
+	if _, err := s.At(tickAt(10), func() { order = append(order, "message") }); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.AtEnd(tickAt(10), func() { order = append(order, "deadline") }); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.At(tickAt(10), func() { order = append(order, "message-2") }); err != nil {
+		t.Fatal(err)
+	}
+
+	for s.next() != nil {
+		if err := s.step(); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	want := []string{"message", "message-2", "deadline"}
+	if len(order) != len(want) {
+		t.Fatalf("order = %v, want %v", order, want)
+	}
+	for i := range want {
+		if order[i] != want[i] {
+			t.Fatalf("order = %v, want %v", order, want)
+		}
+	}
+}
+
+func TestSchedulerEndOfInstantWorkStillFollowsTime(t *testing.T) {
+	s := newTestScheduler(t)
+	var order []string
+	if _, err := s.AtEnd(tickAt(10), func() { order = append(order, "early-deadline") }); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.At(tickAt(20), func() { order = append(order, "late-message") }); err != nil {
+		t.Fatal(err)
+	}
+	for s.next() != nil {
+		if err := s.step(); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if len(order) != 2 || order[0] != "early-deadline" || order[1] != "late-message" {
+		t.Fatalf("order = %v, want [early-deadline late-message]", order)
+	}
+}
+
 func TestSchedulerTieBreakForWorkScheduledDuringExecution(t *testing.T) {
 	s := newTestScheduler(t)
 	var order []string

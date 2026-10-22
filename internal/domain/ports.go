@@ -19,5 +19,13 @@ type Timer interface {
 // Clamping would silently reorder events, and reordering is exactly the class of
 // bug a deterministic simulator exists to make impossible.
 type Scheduler interface {
+	// At runs fn at the given virtual time, in scheduling order with other
+	// work at the same instant.
 	At(at Tick, fn func()) (Timer, error)
+
+	// AtEnd runs fn at the given virtual time, after all work registered with
+	// At for that same instant. Deadline expiry uses it so a message that
+	// arrives exactly on the deadline still counts as evidence; otherwise the
+	// outcome of a tie would depend on which timer happened to be armed first.
+	AtEnd(at Tick, fn func()) (Timer, error)
 }

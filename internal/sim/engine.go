@@ -133,6 +133,9 @@ func (e *Engine) Now() domain.Tick { return e.sched.now }
 // At schedules work at a virtual time, rejecting the past.
 func (e *Engine) At(at domain.Tick, fn func()) (domain.Timer, error) { return e.sched.At(at, fn) }
 
+// AtEnd schedules work after all ordinary work at the same virtual instant.
+func (e *Engine) AtEnd(at domain.Tick, fn func()) (domain.Timer, error) { return e.sched.AtEnd(at, fn) }
+
 // Truth reports a node's actual execution state. Tests and the CLI use it to
 // compare ground truth with observer belief; the detector has no access to it.
 func (e *Engine) Truth(id domain.NodeID) (domain.NodeState, bool) {

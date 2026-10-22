@@ -25,16 +25,29 @@ var (
 	ErrStepLimit = errors.New("scheduler step limit exceeded")
 )
 
+// taskClass separates ordinary work from deadline expiry at a single instant.
+//
+// A deadline is the last moment at which the absence of a message means
+// something, so evidence that arrives at exactly that moment has to be read
+// first. Class is the middle key of the ordering: (at, class, seq).
+type taskClass uint8
+
+const (
+	classNormal taskClass = iota
+	classEnd
+)
+
 // task is one scheduled unit of work.
 //
-// seq is assigned when the task is scheduled, never when it runs. Equal
-// timestamps therefore execute in scheduling order, which is the documented
-// tie-break rule: the deadline that was armed first fires first. The rule is
-// arbitrary but explicit, and the tests hold it still.
+// seq is assigned when the task is scheduled, never when it runs. Tasks at the
+// same instant and of the same class therefore execute in scheduling order,
+// which is the documented tie-break rule: the timer armed first fires first.
+// The rule is arbitrary but explicit, and the tests hold it still.
 type task struct {
-	at  domain.Tick
-	seq uint64
-	run func()
+	at    domain.Tick
+	class taskClass
+	seq   uint64
+	run   func()
 
 	// dead marks a cancelled task. It stays in the queue as a tombstone and is
 	// discarded when it reaches the head, so cancelling never has to search the
@@ -54,6 +67,9 @@ func (q taskQueue) Len() int { return len(q) }
 func (q taskQueue) Less(i, j int) bool {
 	if q[i].at != q[j].at {
 		return q[i].at < q[j].at
+	}
+	if q[i].class != q[j].class {
+		return q[i].class < q[j].class
 	}
 	return q[i].seq < q[j].seq
 }
@@ -87,8 +103,17 @@ func newScheduler(limit int) *scheduler {
 	return &scheduler{limit: limit}
 }
 
-// At schedules fn to run at the given virtual time.
+// At schedules fn to run at the given virtual time with ordinary work.
 func (s *scheduler) At(at domain.Tick, fn func()) (domain.Timer, error) {
+	return s.schedule(at, classNormal, fn)
+}
+
+// AtEnd schedules fn to run after all ordinary work at the given instant.
+func (s *scheduler) AtEnd(at domain.Tick, fn func()) (domain.Timer, error) {
+	return s.schedule(at, classEnd, fn)
+}
+
+func (s *scheduler) schedule(at domain.Tick, class taskClass, fn func()) (domain.Timer, error) {
 	if fn == nil {
 		return nil, ErrNilTask
 	}
@@ -96,7 +121,7 @@ func (s *scheduler) At(at domain.Tick, fn func()) (domain.Timer, error) {
 		return nil, fmt.Errorf("%w: at %d, now %d", ErrScheduleInPast, at, s.now)
 	}
 	s.nextSeq++
-	t := &task{at: at, seq: s.nextSeq, run: fn}
+	t := &task{at: at, class: class, seq: s.nextSeq, run: fn}
 	heap.Push(&s.queue, t)
 	return t, nil
 }
