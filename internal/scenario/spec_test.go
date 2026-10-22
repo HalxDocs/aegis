@@ -90,3 +90,32 @@ func TestNodeAndLinkRulesStayWithTheSimulator(t *testing.T) {
 		t.Fatalf("error = %v, want the simulator's verdict, not the spec's", err)
 	}
 }
+
+func TestRunSnapshotsTheSpecItExecuted(t *testing.T) {
+	spec := NodeCrash()
+	res, err := Run(spec, 1)
+	if err != nil {
+		t.Fatalf("Run() = %v", err)
+	}
+
+	// Editing the caller's value must not rewrite a run that already happened.
+	spec.Name = "tampered"
+	spec.Nodes[1].Peers[0] = "C"
+	spec.Observers[0].Timeout = 1
+	if res.Spec.Name != "node-crash" {
+		t.Fatalf("result name = %q, want the executed scenario", res.Spec.Name)
+	}
+	if got := res.Spec.Nodes[1].Peers[0]; got != "A" {
+		t.Fatalf("result peers = %v, want the executed peer list", res.Spec.Nodes[1].Peers)
+	}
+	if got := res.Spec.Observers[0].Timeout; got != tick(350) {
+		t.Fatalf("result timeout = %d, want 350ms", got)
+	}
+
+	// The sharing must not go the other way either.
+	res.Spec.Nodes[0].ID = "Z"
+	res.Spec.Crash.At = 0
+	if spec.Nodes[0].ID != "A" || spec.Crash.At != tick(215) {
+		t.Fatalf("caller's spec was mutated through the result: %+v", spec.Nodes[0])
+	}
+}
