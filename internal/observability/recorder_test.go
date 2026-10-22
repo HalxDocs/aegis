@@ -159,3 +159,23 @@ func TestWriteJSONLOfAnEmptyHistoryIsEmpty(t *testing.T) {
 		t.Fatalf("output = %q, want empty", out.String())
 	}
 }
+
+// failWriter refuses every write, which is how a closed pipe behaves.
+type failWriter struct{ err error }
+
+func (w failWriter) Write([]byte) (int, error) { return 0, w.err }
+
+func TestWriteJSONLReportsEncoderFailures(t *testing.T) {
+	r := NewRecorder()
+	if err := r.Record(event(domain.KindHeartbeatSent, 1)); err != nil {
+		t.Fatal(err)
+	}
+	boom := errors.New("write end closed")
+	err := r.WriteJSONL(failWriter{err: boom})
+	if !errors.Is(err, boom) {
+		t.Fatalf("error = %v, want %v", err, boom)
+	}
+	if !strings.Contains(err.Error(), "event 1") {
+		t.Fatalf("error %q does not name the event that failed", err)
+	}
+}
