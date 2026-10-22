@@ -89,10 +89,34 @@ func TestStartIsOnceOnly(t *testing.T) {
 	}
 }
 
-func TestSetReceiverRejectsNil(t *testing.T) {
+func TestAddReceiverRejectsNil(t *testing.T) {
 	e, _ := newTestEngine(t, EngineConfig{})
-	if err := e.SetReceiver(nil); !errors.Is(err, ErrNoReceiver) {
+	if err := e.AddReceiver(nil); !errors.Is(err, ErrNoReceiver) {
 		t.Fatalf("error = %v, want ErrNoReceiver", err)
+	}
+}
+
+func TestEveryReceiverSeesEveryDeliveryInRegistrationOrder(t *testing.T) {
+	e, _, _, _ := canonicalEngine(t)
+	second := &stubReceiver{}
+	if err := e.AddReceiver(second); err != nil {
+		t.Fatal(err)
+	}
+	if err := e.Start(); err != nil {
+		t.Fatal(err)
+	}
+	if err := e.Run(tickAt(250)); err != nil {
+		t.Fatal(err)
+	}
+
+	first := e.receivers[0].(*stubReceiver)
+	if len(first.got) != 4 || len(second.got) != 4 {
+		t.Fatalf("deliveries = %d and %d, want 4 each", len(first.got), len(second.got))
+	}
+	for i := range first.got {
+		if first.got[i] != second.got[i] {
+			t.Fatalf("delivery %d differs between receivers: %+v and %+v", i, first.got[i], second.got[i])
+		}
 	}
 }
 

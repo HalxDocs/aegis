@@ -119,8 +119,8 @@ func canonicalEngine(t *testing.T) (*Engine, *stubRecorder, *stubReceiver, *reco
 	}
 
 	rx := &stubReceiver{}
-	if err := e.SetReceiver(rx); err != nil {
-		t.Fatalf("SetReceiver: %v", err)
+	if err := e.AddReceiver(rx); err != nil {
+		t.Fatalf("AddReceiver: %v", err)
 	}
 	lis := &recordingListener{}
 	if err := e.OnCrash(lis); err != nil {

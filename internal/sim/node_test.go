@@ -93,7 +93,7 @@ func TestNodeVisitsPeersInSortedOrder(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if err := e.SetReceiver(&stubReceiver{}); err != nil {
+	if err := e.AddReceiver(&stubReceiver{}); err != nil {
 		t.Fatal(err)
 	}
 	if err := e.Start(); err != nil {

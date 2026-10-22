@@ -35,9 +35,11 @@ type EventRecorder interface {
 	Record(domain.Event) error
 }
 
-// Receiver is told about messages that actually arrived at a node. The
-// detector is the only implementation; the simulator never decides what an
-// observer believes.
+// Receiver is told about messages that actually arrived. A detector is the only
+// implementation; the simulator never decides what an observer believes.
+//
+// Every receiver sees every delivery and decides for itself whether the message
+// concerns it, because the simulator knows nothing about who is watching whom.
 type Receiver interface {
 	HeartbeatReceived(at domain.Tick, from, to domain.NodeID, round uint64) error
 }
@@ -65,7 +67,7 @@ type Engine struct {
 	net            *network
 	nodes          map[domain.NodeID]*node
 	order          []domain.NodeID
-	receiver       Receiver
+	receivers      []Receiver
 	crashListeners []CrashListener
 	err            error
 	started        bool
@@ -119,12 +121,16 @@ func (e *Engine) AddLink(cfg LinkConfig) error {
 	return e.net.addLink(cfg)
 }
 
-// SetReceiver attaches the component that observes delivered messages.
-func (e *Engine) SetReceiver(r Receiver) error {
+// AddReceiver registers a component that observes delivered messages.
+//
+// Receivers are called in registration order for every delivery. Two observers
+// watching the same sender therefore write their receipts in a fixed sequence,
+// which keeps the log reproducible no matter how many observers exist.
+func (e *Engine) AddReceiver(r Receiver) error {
 	if r == nil {
 		return ErrNoReceiver
 	}
-	e.receiver = r
+	e.receivers = append(e.receivers, r)
 	return nil
 }
 
@@ -195,12 +201,15 @@ func (e *Engine) fail(err error) {
 }
 
 func (e *Engine) deliver(at domain.Tick, msg Message) {
-	if e.receiver == nil {
+	if len(e.receivers) == 0 {
 		e.fail(ErrNoReceiver)
 		return
 	}
-	if err := e.receiver.HeartbeatReceived(at, msg.From, msg.To, msg.Round); err != nil {
-		e.fail(fmt.Errorf("deliver heartbeat %s->%s round %d: %w", msg.From, msg.To, msg.Round, err))
+	for _, r := range e.receivers {
+		if err := r.HeartbeatReceived(at, msg.From, msg.To, msg.Round); err != nil {
+			e.fail(fmt.Errorf("deliver heartbeat %s->%s round %d: %w", msg.From, msg.To, msg.Round, err))
+			return
+		}
 	}
 }
 
