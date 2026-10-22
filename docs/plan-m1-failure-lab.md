@@ -1,6 +1,8 @@
 # Aegis — Milestone 1 Plan: the Failure Lab
 
-**Status:** plan only. No Go code exists yet; the workspace has this document and nothing else.
+**Status:** delivered. This document is the plan as it was written before any code existed; it is kept unchanged so
+the drift is visible. [doc_m1.md](../doc_m1.md) records what was built, every engineering decision, what could break,
+and the verification evidence.
 **Source:** `aegis_full_architecture_blueprint.pdf` (v1, 16 pages).
 **Governing principle (verbatim from the blueprint):** every recovery action must be justified by observable
 evidence, constrained by safety rules, and verified afterward. M1 builds the *evidence* half of that sentence and
