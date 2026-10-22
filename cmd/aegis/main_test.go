@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/HalxDocs/aegis/internal/domain"
 	"github.com/HalxDocs/aegis/internal/scenario"
 )
 
@@ -103,5 +105,46 @@ func TestHelpSucceeds(t *testing.T) {
 	}
 	if _, _, err := exec(t, "run", "-h"); err != nil {
 		t.Fatalf("run -h: %v", err)
+	}
+}
+
+func TestDetailCoversEveryEventKind(t *testing.T) {
+	cases := map[string]struct {
+		event domain.Event
+		want  string
+	}{
+		"scenario":        {domain.Event{Kind: domain.KindScenarioStarted, Scenario: "node-crash"}, "node-crash"},
+		"started":         {domain.Event{Kind: domain.KindNodeStarted, Node: "B"}, "B started"},
+		"crashed":         {domain.Event{Kind: domain.KindNodeCrashed, Node: "B"}, "B crashed (ground truth)"},
+		"sent":            {domain.Event{Kind: domain.KindHeartbeatSent, Node: "B", Peer: "A", Round: 3}, "B->A round 3"},
+		"received":        {domain.Event{Kind: domain.KindHeartbeatReceived, Node: "B", Peer: "A", Round: 3}, "B->A round 3"},
+		"dropped":         {domain.Event{Kind: domain.KindMessageDropped, Node: "B", Peer: "A", Round: 3, Reason: domain.ReasonDropPolicy}, "B->A round 3 (drop_policy)"},
+		"suspicion":       {domain.Event{Kind: domain.KindSuspicionRaised, Node: "B", Peer: "A", Reason: domain.ReasonHeartbeatTimeout}, "B distrusted by A (heartbeat_timeout)"},
+		"suspicion clear": {domain.Event{Kind: domain.KindSuspicionCleared, Node: "B", Peer: "A"}, "B trusted again by A"},
+		"unknown":         {domain.Event{Kind: domain.Kind("invented")}, ""},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			if got := detail(tc.event); got != tc.want {
+				t.Fatalf("detail() = %q, want %q", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestDescribeBothBeliefs(t *testing.T) {
+	suspected := domain.Observation{
+		Observer: "A", Target: "B", Belief: domain.BeliefSuspected,
+		LastSeen: domain.TickFrom(220 * time.Millisecond), SuspectedAt: domain.TickFrom(570 * time.Millisecond),
+	}
+	if got, want := describe(suspected), "suspected since 570ms (silent 350ms, last seen 220ms)"; got != want {
+		t.Fatalf("describe(suspected) = %q, want %q", got, want)
+	}
+	healthy := domain.Observation{
+		Observer: "A", Target: "B", Belief: domain.BeliefHealthy,
+		LastSeen: domain.TickFrom(900 * time.Millisecond),
+	}
+	if got, want := describe(healthy), "healthy (last seen 900ms)"; got != want {
+		t.Fatalf("describe(healthy) = %q, want %q", got, want)
 	}
 }
