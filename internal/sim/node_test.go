@@ -175,3 +175,29 @@ func TestCrashedNodeRejectsFurtherWork(t *testing.T) {
 		t.Fatal("a crashed node must reject a restart")
 	}
 }
+
+func TestCrashAndHeartbeatAtTheSameInstantFollowSchedulingOrder(t *testing.T) {
+	e, rec, rx := canonicalEngine(t)
+	if err := e.Start(); err != nil {
+		t.Fatal(err)
+	}
+	// Start armed round one for 100ms before the crash was requested, so the
+	// round is sent and the crash then stops the round after it.
+	if err := e.CrashAt(tickAt(100), "B"); err != nil {
+		t.Fatal(err)
+	}
+	if err := e.Run(tickAt(200)); err != nil {
+		t.Fatal(err)
+	}
+
+	if got := rec.count(domain.KindHeartbeatSent); got != 2 {
+		t.Fatalf("heartbeats = %d, want the round that was already armed", got)
+	}
+	if got := len(rx.got); got != 2 {
+		t.Fatalf("deliveries = %d, want the round that was already sent", got)
+	}
+	if state, _ := e.Truth("B"); state != domain.StateCrashed {
+		t.Fatalf("truth for B = %s, want crashed", state)
+	}
+	rec.requireClean(t)
+}
