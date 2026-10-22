@@ -155,3 +155,24 @@ func TestNetworkRejectsDuplicateLink(t *testing.T) {
 		t.Fatal("duplicate link must be rejected")
 	}
 }
+
+func TestHeartbeatToAPeerWithoutALinkStopsTheRun(t *testing.T) {
+	e, _ := newTestEngine(t, EngineConfig{})
+	for _, cfg := range []NodeConfig{
+		{ID: "A"},
+		{ID: "B", HeartbeatEvery: tickAt(100), Peers: []domain.NodeID{"A"}},
+	} {
+		if err := e.AddNode(cfg); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := e.AddReceiver(&stubReceiver{}); err != nil {
+		t.Fatal(err)
+	}
+	if err := e.Start(); err != nil {
+		t.Fatal(err)
+	}
+	if err := e.Run(tickAt(200)); !errors.Is(err, ErrUnknownLink) {
+		t.Fatalf("Run error = %v, want ErrUnknownLink: an undeclared path must not be guessed", err)
+	}
+}
