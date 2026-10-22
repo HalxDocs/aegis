@@ -283,3 +283,33 @@ func TestReturnedSnapshotsCannotMutateTheDetector(t *testing.T) {
 		t.Fatalf("internal target list mutated through a snapshot: %v", got)
 	}
 }
+
+func TestWatchingMidRunStartsTheDeadlineFromNow(t *testing.T) {
+	h := newHarness(t, "A", tickAt(350))
+	h.sched.run(tickAt(500), true)
+
+	h.mustWatch(t, "B")
+	if got := h.sched.liveTask(t); got.at != tickAt(850) || got.class != classEnd {
+		t.Fatalf("deadline = %d class %d, want %d at end of instant", got.at, got.class, tickAt(850))
+	}
+	h.sched.run(tickAt(849), true)
+	if obs := h.believe(t, "B"); obs.Belief != domain.BeliefHealthy {
+		t.Fatalf("belief at 849 = %s, want healthy", obs.Belief)
+	}
+	h.sched.run(tickAt(850), true)
+	if obs := h.believe(t, "B"); obs.Belief != domain.BeliefSuspected || obs.SuspectedAt != tickAt(850) {
+		t.Fatalf("belief = %+v, want suspected at 850", obs)
+	}
+	// Never having heard from the target is enough to stop trusting it. The
+	// report has no earlier evidence to measure from, so its silence runs from
+	// the start of the run (850ms), not from the moment watching began (350ms).
+	// Milestone 1 watches from tick zero, where the two are the same; a target
+	// joined mid-run would need a "watching since" field to be exact.
+	report := h.det.Reports()[0]
+	if report.LastSeenAt != 0 || report.Silence != tickAt(850) {
+		t.Fatalf("report = %+v, want silence measured from the start of the run", report)
+	}
+	if err := report.Validate(); err != nil {
+		t.Fatalf("report invalid: %v", err)
+	}
+}

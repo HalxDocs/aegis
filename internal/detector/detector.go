@@ -120,6 +120,11 @@ func (d *Detector) Timeout() domain.Tick { return d.timeout }
 // The initial deadline matters: an observer that has never heard from a target
 // must still stop trusting it, otherwise a node that dies before its first
 // heartbeat would be believed healthy forever.
+//
+// Watching is therefore allowed at any virtual time. A target that is never
+// heard from produces a report whose silence is measured from the start of the
+// run, because there is no arrival to measure from; the milestone's scenarios
+// watch from tick zero, where that is exact.
 func (d *Detector) Watch(target domain.NodeID) error {
 	if err := target.Validate(); err != nil {
 		return fmt.Errorf("detector %s: watch: %w", d.observer, err)

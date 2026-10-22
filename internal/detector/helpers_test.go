@@ -94,6 +94,9 @@ func (s *fakeScheduler) run(t domain.Tick, honourCancel bool) {
 			break
 		}
 		if next == nil {
+			// Like the simulator, the clock ends at the horizon even when the
+			// queue is empty, so work scheduled afterwards starts from there.
+			s.now = t
 			return
 		}
 		s.remove(next)
