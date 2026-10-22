@@ -54,6 +54,7 @@ func (r Result) ReportsFor(observer domain.NodeID) []domain.FailureReport {
 // mutable state. The only cross-run input is the spec, which is treated as
 // read-only and copied where the engine could otherwise alias it.
 func Run(spec Spec, seed uint64) (Result, error) {
+	spec = spec.clone()
 	if err := spec.validate(); err != nil {
 		return Result{}, err
 	}

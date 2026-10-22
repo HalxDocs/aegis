@@ -3,6 +3,7 @@ package scenario
 import (
 	"errors"
 	"fmt"
+	"slices"
 	"time"
 
 	"github.com/HalxDocs/aegis/internal/domain"
@@ -42,6 +43,27 @@ type Spec struct {
 	Observers []ObserverSpec
 	Crash     *CrashSpec
 	Horizon   domain.Tick
+}
+
+// clone returns a snapshot that shares no mutable state with the receiver.
+//
+// A run keeps the spec it executed so the result can explain itself, and a
+// caller that reuses and edits its Spec afterwards must not be able to rewrite
+// the history of a run that already happened.
+func (s Spec) clone() Spec {
+	out := s
+	out.Nodes = make([]sim.NodeConfig, len(s.Nodes))
+	for i, cfg := range s.Nodes {
+		cfg.Peers = slices.Clone(cfg.Peers)
+		out.Nodes[i] = cfg
+	}
+	out.Links = slices.Clone(s.Links)
+	out.Observers = slices.Clone(s.Observers)
+	if s.Crash != nil {
+		crash := *s.Crash
+		out.Crash = &crash
+	}
+	return out
 }
 
 // validate rejects a scenario before any of it is simulated.
