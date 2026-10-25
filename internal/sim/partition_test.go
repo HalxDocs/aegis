@@ -221,3 +221,26 @@ func TestPartitionRequiresADeclaredLink(t *testing.T) {
 		t.Fatal("an invalid node id was accepted as a cut endpoint")
 	}
 }
+
+// TestCutsAreKeptInStartOrder keeps the cut list sorted however the scenario
+// declared it, so the predicate never depends on declaration order.
+func TestCutsAreKeptInStartOrder(t *testing.T) {
+	net, _, _, _ := newTestNetwork(t, 1)
+	link := mustLink(t, "B", "A")
+	if err := net.addLink(LinkConfig{From: "B", To: "A", Latency: tickAt(20)}); err != nil {
+		t.Fatal(err)
+	}
+	net.addCut(link, tickAt(700), tickAt(800))
+	net.addCut(link, tickAt(300), tickAt(400))
+
+	got := net.links[link].cuts
+	want := []cut{{from: tickAt(300), until: tickAt(400)}, {from: tickAt(700), until: tickAt(800)}}
+	if len(got) != len(want) {
+		t.Fatalf("cuts = %+v, want %+v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("cut %d = %+v, want %+v", i, got[i], want[i])
+		}
+	}
+}
