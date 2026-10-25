@@ -29,7 +29,9 @@ const (
 	// KindHeartbeatSent records a message leaving a node.
 	KindHeartbeatSent Kind = "heartbeat_sent"
 
-	// KindMessageDropped records a message the network discarded before delivery.
+	// KindMessageDropped records a message the network discarded instead of
+	// delivering it. It is written at the instant the message failed to arrive,
+	// which for a cut path is later than the send.
 	KindMessageDropped Kind = "message_dropped"
 
 	// KindHeartbeatReceived records a message that actually reached an observer.
@@ -40,6 +42,14 @@ const (
 
 	// KindSuspicionCleared records an observer regaining trust in a target.
 	KindSuspicionCleared Kind = "suspicion_cleared"
+
+	// KindLinkPartitioned records one direction of a link becoming unusable.
+	// Node is the sending end and Peer the receiving end, so the event names the
+	// half of the path that stopped working.
+	KindLinkPartitioned Kind = "link_partitioned"
+
+	// KindLinkRestored records a partitioned direction becoming usable again.
+	KindLinkRestored Kind = "link_restored"
 )
 
 // String returns the kind as written in event logs.
@@ -51,7 +61,8 @@ func (k Kind) Valid() bool {
 	case KindScenarioStarted, KindScenarioFinished,
 		KindNodeStarted, KindNodeCrashed,
 		KindHeartbeatSent, KindMessageDropped, KindHeartbeatReceived,
-		KindSuspicionRaised, KindSuspicionCleared:
+		KindSuspicionRaised, KindSuspicionCleared,
+		KindLinkPartitioned, KindLinkRestored:
 		return true
 	default:
 		return false
