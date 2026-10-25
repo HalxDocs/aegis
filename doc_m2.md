@@ -96,3 +96,16 @@ would destroy the only record of the mistake this milestone is about.
 **D7 — The cut is in the log.** `link_partitioned` and `link_restored` explain the drops. At 300 ms the partition event
 precedes the heartbeats because it was scheduled during configuration, before any timer was armed — a stable ordering
 by construction rather than by luck.
+
+## 5. Failure modes, and what stops them
+
+| Failure | What stops it |
+| --- | --- |
+| A cut in flight is ignored because it is evaluated at send | `cutDuring` tests the whole transit; `loss in flight` case in `TestPartitionLosesOnlyMessagesThatCrossIt` |
+| A message survives a cut because the heal ran first | the predicate is pure configuration, so task order cannot change it |
+| The return path dies too, silently | `TestPartitionLeavesTheReturnPathWorking` counts A->B sends against B's receipts and requires equality |
+| The detector learns about the cut | the detector still imports only `domain`; the network never calls a receiver except on delivery |
+| The belief follows the topology | `TestRepairingThePathDoesNotRepairTheBelief` requires the clear at 920, one link latency after the repair |
+| A cut is announced but never repaired in the log, or vice versa | `TestPartitionBeyondTheHorizonIsNeverRepaired` |
+| A rejected cut leaves a half-written log | cuts are declared before `scenario_started`, and `PartitionAt` validates before it schedules |
+| A failed write inside a scheduled task disappears | the network holds the engine's `Fail`, and the test network fails the test |
