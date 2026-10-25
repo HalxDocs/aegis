@@ -1,4 +1,5 @@
 GO ?= go
+SCENARIOS ?= node-crash one-way-partition
 
 .PHONY: all build fmt fmt-check vet test race check cover replay demo clean
 
@@ -31,18 +32,23 @@ cover:
 
 check: fmt-check vet build test race
 
-# Two runs of one scenario must produce identical bytes. Comparing parsed events
-# would miss reordering, which is exactly the defect this target exists to catch.
+# Two runs of every scenario must produce identical bytes. Comparing parsed
+# events would miss reordering, which is exactly the defect this target exists to
+# catch, and a scenario that is deterministic only by luck is not deterministic.
 replay:
-	@first=$$(mktemp); second=$$(mktemp); \
-	$(GO) run ./cmd/aegis run --scenario node-crash --format jsonl > "$$first"; \
-	$(GO) run ./cmd/aegis run --scenario node-crash --format jsonl > "$$second"; \
-	if diff -u "$$first" "$$second"; then \
-		echo "replay: identical"; \
-		rm -f "$$first" "$$second"; \
-	else \
-		rm -f "$$first" "$$second"; exit 1; \
-	fi
+	@for s in $(SCENARIOS); do \
+		first=$$(mktemp); second=$$(mktemp); \
+		$(GO) run ./cmd/aegis run --scenario $$s --format jsonl > "$$first"; \
+		$(GO) run ./cmd/aegis run --scenario $$s --format jsonl > "$$second"; \
+		if diff -u "$$first" "$$second" > /dev/null; then \
+			echo "replay $$s: identical"; \
+			rm -f "$$first" "$$second"; \
+		else \
+			diff -u "$$first" "$$second"; \
+			rm -f "$$first" "$$second"; \
+			exit 1; \
+		fi; \
+	done
 
 demo:
 	$(GO) run ./cmd/aegis run --scenario node-crash --format table
