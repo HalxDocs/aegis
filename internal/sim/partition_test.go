@@ -244,3 +244,21 @@ func TestCutsAreKeptInStartOrder(t *testing.T) {
 		}
 	}
 }
+
+func TestPartitionRejectsACutInThePast(t *testing.T) {
+	e, _, _ := canonicalEngine(t)
+	if err := e.Start(); err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+	if err := e.Run(tickAt(200)); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	err := e.PartitionAt("B", "A", tickAt(150), tickAt(300))
+	if !errors.Is(err, ErrScheduleInPast) {
+		t.Fatalf("error = %v, want ErrScheduleInPast", err)
+	}
+	// A rejected cut must not have been recorded either.
+	if cuts := e.net.links[mustLink(t, "B", "A")].cuts; len(cuts) != 0 {
+		t.Fatalf("cuts on B->A = %d, want none after a rejected cut", len(cuts))
+	}
+}
