@@ -2,6 +2,7 @@ package scenario
 
 import (
 	"errors"
+	"os"
 	"slices"
 	"testing"
 
@@ -197,5 +198,23 @@ func TestCutIntervalRulesStayWithTheSimulator(t *testing.T) {
 				t.Fatalf("error = %v, want the simulator's verdict, not the spec's", err)
 			}
 		})
+	}
+}
+
+// TestOneWayPartitionMatchesTheCommittedLog pins the canonical history as bytes,
+// which is what makes the fixture a proof rather than an example.
+func TestOneWayPartitionMatchesTheCommittedLog(t *testing.T) {
+	committed, err := os.ReadFile("testdata/one-way-partition.jsonl")
+	if err != nil {
+		t.Fatalf("read fixture: %v", err)
+	}
+	got := jsonl(t, mustRun(t, OneWayPartition(), 0))
+	if got != string(committed) {
+		t.Fatalf("run does not match testdata/one-way-partition.jsonl:\n%s", got)
+	}
+
+	// No drop rate means no random draw, so the seed cannot leak into the log.
+	if other := jsonl(t, mustRun(t, OneWayPartition(), 99)); other != got {
+		t.Fatal("a scenario without random decisions depended on the seed")
 	}
 }
