@@ -190,7 +190,12 @@ func (n *network) send(at domain.Tick, msg Message) error {
 	dropped := n.rng.hit(w.dropPPM)
 	if !dropped {
 		arrives := at + w.latency
-		if _, err := n.sched.At(arrives, func() { n.deliver(arrives, msg) }); err != nil {
+		// A cut path loses the message in flight: it is accepted by the sender
+		// and never reaches anyone. The loss is recorded at the arrival instant
+		// rather than the send, because that is when the message fails to
+		// arrive and when an observer's silence starts to mean something.
+		lost := w.cutDuring(at, arrives)
+		if _, err := n.sched.At(arrives, func() { n.arrive(arrives, msg, lost) }); err != nil {
 			return fmt.Errorf("schedule delivery of %s: %w", link, err)
 		}
 	}
@@ -207,6 +212,19 @@ func (n *network) send(at domain.Tick, msg Message) error {
 		return nil
 	}
 	return n.recordDrop(at, msg, domain.ReasonDropPolicy)
+}
+
+// arrive is what becomes of a message that was accepted by the sender.
+func (n *network) arrive(at domain.Tick, msg Message, lost bool) {
+	if !lost {
+		n.deliver(at, msg)
+		return
+	}
+	if err := n.recordDrop(at, msg, domain.ReasonPartition); err != nil {
+		if n.fault != nil {
+			n.fault(err)
+		}
+	}
 }
 
 // recordDrop writes the outcome of a message that never reached its receiver.
