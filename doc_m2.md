@@ -40,3 +40,19 @@ Final state: truth is `running` for all three; A believes B healthy (last seen 1
 
 The fixture is [internal/scenario/testdata/one-way-partition.jsonl](../internal/scenario/testdata/one-way-partition.jsonl),
 75 events, compared as bytes by `TestOneWayPartitionMatchesTheCommittedLog`.
+
+## 3. What changed
+
+| File | Change |
+| --- | --- |
+| `internal/domain/event.go` | `link_partitioned`, `link_restored`, `ReasonPartition`; both new kinds validated as peer-only, no round, no reason |
+| `internal/sim/network.go` | `cut`, `cut.crosses`, `wire.cutDuring`, `validateCut`, `addCut`, `arrive`; the send path now resolves the cut and schedules the outcome |
+| `internal/sim/run.go` | `Engine.PartitionAt` schedules both ends of an outage and records them |
+| `internal/sim/engine.go` | the network gets the engine's `Fail`, so a scheduled write cannot vanish |
+| `internal/scenario/spec.go` | `PartitionSpec`, `Spec.Partitions`, name validation, `OneWayPartition()` |
+| `internal/scenario/run.go` | cuts are declared before the history opens, so a rejected cut leaves no log |
+| `cmd/aegis` | `--scenario one-way-partition`, and table rendering for the two new events |
+| `Makefile` | `make replay` covers every scenario in `SCENARIOS`, not just the canonical one |
+
+Nothing in the M1 path changed shape: `--scenario node-crash` still produces the same 16 events, byte for byte, and
+`TestCanonicalScenarioReproducesTheExpectedTimeline` was not touched.
