@@ -1,6 +1,7 @@
 package scenario
 
 import (
+	"errors"
 	"slices"
 	"testing"
 
@@ -135,5 +136,22 @@ func TestPartitionLeavesTheReturnPathWorking(t *testing.T) {
 	}
 	if drops != 6 {
 		t.Fatalf("drops = %d, want the six rounds sent during the cut", drops)
+	}
+}
+
+func TestPartitionNamesMustResolve(t *testing.T) {
+	cases := map[string]func(*Spec){
+		"unknown sender": func(s *Spec) { s.Partitions[0].From = "D" },
+		"unknown target": func(s *Spec) { s.Partitions[0].To = "D" },
+		"invalid sender": func(s *Spec) { s.Partitions[0].From = "bad node" },
+	}
+	for name, mutate := range cases {
+		t.Run(name, func(t *testing.T) {
+			spec := OneWayPartition()
+			mutate(&spec)
+			if _, err := Run(spec, 1); !errors.Is(err, ErrInvalidSpec) {
+				t.Fatalf("Run() = %v, want ErrInvalidSpec", err)
+			}
+		})
 	}
 }
