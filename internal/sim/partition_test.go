@@ -149,3 +149,24 @@ func TestPartitionAnnouncesBothEnds(t *testing.T) {
 	}
 	rec.requireClean(t)
 }
+
+// TestPartitionBeyondTheHorizonIsNeverRepaired covers a cut that outlives the
+// run: the log must not claim a repair that did not happen.
+func TestPartitionBeyondTheHorizonIsNeverRepaired(t *testing.T) {
+	e, rec, _ := canonicalEngine(t)
+	if err := e.PartitionAt("B", "A", tickAt(250), tickAt(5000)); err != nil {
+		t.Fatalf("PartitionAt: %v", err)
+	}
+	if err := e.Start(); err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+	if err := e.Run(tickAt(600)); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if n := rec.count(domain.KindLinkPartitioned); n != 1 {
+		t.Fatalf("partitioned events = %d, want 1", n)
+	}
+	if n := rec.count(domain.KindLinkRestored); n != 0 {
+		t.Fatalf("restored events = %d, want none before the horizon", n)
+	}
+}
