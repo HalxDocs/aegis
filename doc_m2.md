@@ -109,3 +109,16 @@ by construction rather than by luck.
 | A cut is announced but never repaired in the log, or vice versa | `TestPartitionBeyondTheHorizonIsNeverRepaired` |
 | A rejected cut leaves a half-written log | cuts are declared before `scenario_started`, and `PartitionAt` validates before it schedules |
 | A failed write inside a scheduled task disappears | the network holds the engine's `Fail`, and the test network fails the test |
+
+## 6. Known limitations
+
+1. **A message in flight during a cut is lost, never delivered late.** There is no queue that drains after the repair.
+   Real networks do both; modelling the choice would need a per-link buffer policy and a new observation ("arrived
+   late") that no milestone has asked for.
+2. **No asymmetry within a direction.** A cut disables the path for every message equally; there is no per-message
+   policy, no jitter and no correlated loss. Those remain the rest of M2.
+3. **Overlapping cuts are rejected rather than merged.** A scenario that wants 300–500 and 450–700 must write 300–700.
+4. **No causal history.** The log says what happened, not what depended on what; M2's dependency graph is still open.
+5. **The CLI still exposes a fixed list of scenarios.** Scenario files remain a later milestone.
+6. **Coverage is 93.5% of statements.** The dark branches are unreachable error paths: a recorder that fails only on
+   the drop write, and scheduler calls that cannot fail after the time check.
