@@ -1,6 +1,7 @@
 package scenario
 
 import (
+	"slices"
 	"testing"
 
 	"github.com/HalxDocs/aegis/internal/domain"
@@ -58,5 +59,41 @@ func TestOneWayPartitionBreaksNobodyAndStillFoolsSomebody(t *testing.T) {
 	}
 	if obs.LastSeen != tick(1120) {
 		t.Fatalf("A last saw B at %d, want the final round", obs.LastSeen)
+	}
+}
+
+// TestRepairingThePathDoesNotRepairTheBelief is the second claim: topology and
+// trust are different clocks. A only changes its mind when evidence arrives.
+func TestRepairingThePathDoesNotRepairTheBelief(t *testing.T) {
+	res := mustRun(t, OneWayPartition(), 1)
+
+	var restored, cleared domain.Event
+	var arrivals []domain.Tick
+	for _, ev := range res.Log.Events() {
+		switch {
+		case ev.Kind == domain.KindLinkRestored:
+			restored = ev
+		case ev.Kind == domain.KindSuspicionCleared:
+			cleared = ev
+		case ev.Kind == domain.KindHeartbeatReceived && ev.Peer == "A":
+			arrivals = append(arrivals, ev.At)
+		}
+	}
+
+	if restored.Kind == "" || restored.At != tick(900) {
+		t.Fatalf("restore event = %+v, want B->A restored at 900", restored)
+	}
+	if cleared.Kind == "" || cleared.At != tick(920) {
+		t.Fatalf("cleared event = %+v, want A trusting B again at 920", cleared)
+	}
+	if got := cleared.At - restored.At; got != tick(20) {
+		t.Fatalf("belief followed the repair after %d, want one link latency (%d)", got, tick(20))
+	}
+
+	// A heard nothing for 700 ms, and the repair alone did not change that: the
+	// only thing between the repair and the cleared suspicion is a heartbeat.
+	want := []domain.Tick{tick(120), tick(220), tick(920), tick(1020), tick(1120)}
+	if !slices.Equal(arrivals, want) {
+		t.Fatalf("A received at %v, want %v", arrivals, want)
 	}
 }
