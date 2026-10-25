@@ -47,6 +47,9 @@ func TestEventValidateRejectsIncompleteEvents(t *testing.T) {
 		"dropped without a reason":   {Kind: domain.KindMessageDropped, Node: "B", Peer: "A", Round: 1},
 		"suspicion without a reason": {Kind: domain.KindSuspicionRaised, Node: "A", Peer: "B"},
 		"cleared without a peer":     {Kind: domain.KindSuspicionCleared, Node: "A"},
+		"cut without a peer":         {Kind: domain.KindLinkPartitioned, Node: "B"},
+		"cut with a round":           {Kind: domain.KindLinkPartitioned, Node: "B", Peer: "A", Round: 1},
+		"cut with a reason":          {Kind: domain.KindLinkRestored, Node: "B", Peer: "A", Reason: domain.ReasonPartition},
 		"invalid node id":            {Kind: domain.KindNodeStarted, Node: "bad node"},
 	}
 	for name, event := range cases {
