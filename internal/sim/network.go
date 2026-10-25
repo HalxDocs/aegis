@@ -50,6 +50,44 @@ func (c LinkConfig) validate() (domain.Link, error) {
 type wire struct {
 	latency domain.Tick
 	dropPPM uint32
+
+	// cuts are the scheduled outages of this direction, sorted by start. They are
+	// configuration, not runtime state: whether a message is lost depends only on
+	// the intervals and the message's own transit, never on which task happened
+	// to run first at a boundary instant.
+	cuts []cut
+}
+
+// cut is a one-way outage, half-open in time: the path is unusable from from up
+// to, but not including, until.
+type cut struct {
+	from  domain.Tick
+	until domain.Tick
+}
+
+// crosses reports whether a message that left at start and arrives at end was
+// on the path while it was cut.
+//
+// The test is the intersection of the closed transit [start, end] with the open
+// cut (from, until). Treating the cut as open is what makes the boundary
+// decidable without a tie-break: a message that arrives exactly as the path is
+// cut still arrives, and one that departs exactly as the path heals is not
+// delayed. A zero-latency message is decided by the single instant it occupies.
+func (c cut) crosses(start, end domain.Tick) bool {
+	return c.from < end && start < c.until
+}
+
+// cutDuring reports whether any configured cut is crossed by this transit.
+//
+// A message sent before a cut and due after it started is lost in flight, which
+// is why the whole transit is tested rather than the send instant alone.
+func (w wire) cutDuring(start, end domain.Tick) bool {
+	for _, c := range w.cuts {
+		if c.crosses(start, end) {
+			return true
+		}
+	}
+	return false
 }
 
 type network struct {
