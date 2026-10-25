@@ -55,11 +55,11 @@ B is alive and knows it, C can see it, and A is right about everything it can ob
 
 ## Status
 
-Milestone 1 is complete. See [doc_m1.md](doc_m1.md) for every engineering decision, the risks considered, the
-drift between the plan and the code, and the verification evidence behind each claim.
+Milestones 1 and 2 are complete. See [doc_m1.md](doc_m1.md) and [doc_m2.md](doc_m2.md) for every engineering
+decision, the risks considered, the drift between plan and code, and the verification evidence behind each claim.
 
-Deliberately absent from M1: recovery, diagnosis, network partitions, scenario files, and any real concurrency
-inside the simulation. A recovery loop that guesses would be worse than no recovery loop.
+Deliberately absent so far: jitter, correlated loss, causal history, recovery, diagnosis, scenario files, and any
+real concurrency inside the simulation. A recovery loop that guesses would be worse than no recovery loop.
 
 ## Requirements
 
