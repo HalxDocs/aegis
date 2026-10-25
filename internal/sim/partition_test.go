@@ -44,3 +44,76 @@ func TestCutCrossesOnlyWhenTheTransitMeetsIt(t *testing.T) {
 		})
 	}
 }
+
+// TestPartitionLosesOnlyMessagesThatCrossIt drives the whole send path: the
+// canonical cluster, one cut on B->A, and the rounds that must and must not
+// arrive. The B->C link keeps its traffic, so a lost delivery cannot be blamed
+// on the receiver or the sender being broken.
+func TestPartitionLosesOnlyMessagesThatCrossIt(t *testing.T) {
+	cases := map[string]struct {
+		from, until domain.Tick
+		lost        []uint64
+	}{
+		// Rounds leave B at 100, 200, 300, 400, 500 and arrive 20 ms later.
+		"before any traffic":      {from: tickAt(50), until: tickAt(90)},
+		"nothing in the window":   {from: tickAt(600), until: tickAt(700)},
+		"loss in flight":          {from: tickAt(210), until: tickAt(400), lost: []uint64{2, 3}},
+		"boundary at the send":    {from: tickAt(300), until: tickAt(400), lost: []uint64{3}},
+		"boundary at the arrival": {from: tickAt(220), until: tickAt(400), lost: []uint64{3}},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			e, rec, rx := canonicalEngine(t)
+			if err := e.PartitionAt("B", "A", tc.from, tc.until); err != nil {
+				t.Fatalf("PartitionAt: %v", err)
+			}
+			if err := e.Start(); err != nil {
+				t.Fatalf("Start: %v", err)
+			}
+			if err := e.Run(tickAt(550)); err != nil {
+				t.Fatalf("Run: %v", err)
+			}
+
+			lost := make(map[uint64]bool, len(tc.lost))
+			for _, round := range tc.lost {
+				lost[round] = true
+			}
+
+			var toA []uint64
+			for _, hb := range rx.got {
+				if hb.To == "A" {
+					toA = append(toA, hb.Round)
+					if lost[hb.Round] {
+						t.Fatalf("round %d crossed the cut at %d..%d but was delivered at %d",
+							hb.Round, tc.from, tc.until, hb.At)
+					}
+				}
+			}
+			if want := 5 - len(tc.lost); len(toA) != want {
+				t.Fatalf("A received rounds %v, want %d of 5", toA, want)
+			}
+
+			dropped := rec.ofKind(domain.KindMessageDropped)
+			if len(dropped) != len(tc.lost) {
+				t.Fatalf("drops = %d, want %d", len(dropped), len(tc.lost))
+			}
+			for i, ev := range dropped {
+				if ev.Peer != "A" || ev.Node != "B" {
+					t.Fatalf("drop %d = %s->%s, want B->A", i, ev.Node, ev.Peer)
+				}
+				if ev.Reason != domain.ReasonPartition {
+					t.Fatalf("drop %d reason = %q, want %q", i, ev.Reason, domain.ReasonPartition)
+				}
+				if !lost[ev.Round] {
+					t.Fatalf("round %d was dropped but is not expected", ev.Round)
+				}
+				// The loss is reported when the message fails to arrive, not
+				// when it leaves: the sender already believes it was sent.
+				if want := tickAt(int64(ev.Round)*100 + 20); ev.At != want {
+					t.Fatalf("round %d dropped at %d, want its arrival instant %d", ev.Round, ev.At, want)
+				}
+			}
+			rec.requireClean(t)
+		})
+	}
+}
