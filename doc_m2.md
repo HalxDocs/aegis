@@ -122,3 +122,39 @@ by construction rather than by luck.
 5. **The CLI still exposes a fixed list of scenarios.** Scenario files remain a later milestone.
 6. **Coverage is 93.5% of statements.** The dark branches are unreachable error paths: a recorder that fails only on
    the drop write, and scheduler calls that cannot fail after the time check.
+
+## 7. Verification
+
+All commands below were run on the delivered tree.
+
+```
+$ gofmt -l .                      # no output
+$ go vet ./...                    # no output
+$ go build ./...                  # no output
+$ go test ./... -count=1
+ok  github.com/HalxDocs/aegis/cmd/aegis              0.018s
+ok  github.com/HalxDocs/aegis/internal/detector      0.010s
+ok  github.com/HalxDocs/aegis/internal/domain        0.010s
+ok  github.com/HalxDocs/aegis/internal/observability 0.008s
+ok  github.com/HalxDocs/aegis/internal/scenario      0.076s
+ok  github.com/HalxDocs/aegis/internal/sim           0.010s
+
+$ go test -race ./...             # all packages ok
+$ make replay
+replay node-crash: identical
+replay one-way-partition: identical
+```
+
+Coverage (`make cover`): 93.5% total — `cmd/aegis` 93.5%, `detector` 91.2%, `domain` 93.2%, `observability` 100%,
+`scenario` 89.3%, `sim` 95.8%. Size: 6,641 lines of Go, 4,071 of them tests.
+
+| Claim | Evidence |
+| --- | --- |
+| A cut loses only the crossing messages | `TestPartitionLosesOnlyMessagesThatCrossIt`, five cut placements including in-flight loss |
+| Every boundary instant is decided, not tie-broken | `TestCutCrossesOnlyWhenTheTransitMeetsIt`, ten cases |
+| The cut is announced at both ends | `TestPartitionAnnouncesBothEnds` |
+| Nobody failed, yet somebody is wrong | `TestOneWayPartitionBreaksNobodyAndStillFoolsSomebody`: truth running; A reports at 570; B and C report nothing |
+| The repair is not the recovery | `TestRepairingThePathDoesNotRepairTheBelief`: restore 900, clear 920, arrivals `[120 220 920 1020 1120]` |
+| Only one direction is affected | `TestPartitionLeavesTheReturnPathWorking`: 11 sends, 11 receipts, 6 drops, all B->A |
+| The history is reproducible | `TestOneWayPartitionMatchesTheCommittedLog` (bytes), `make replay` |
+| Invalid worlds fail before any log exists | `TestPartitionNamesMustResolve`, `TestCutIntervalRulesStayWithTheSimulator`, `TestPartitionRejectsACutInThePast` |
