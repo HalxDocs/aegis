@@ -1,6 +1,7 @@
 package sim
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/HalxDocs/aegis/internal/domain"
@@ -168,5 +169,43 @@ func TestPartitionBeyondTheHorizonIsNeverRepaired(t *testing.T) {
 	}
 	if n := rec.count(domain.KindLinkRestored); n != 0 {
 		t.Fatalf("restored events = %d, want none before the horizon", n)
+	}
+}
+
+func TestPartitionRejectsIncoherentIntervals(t *testing.T) {
+	link := mustLink(t, "B", "A")
+	cases := map[string]struct {
+		from, until domain.Tick
+		seed        *cut
+		want        error
+	}{
+		"ends before it begins": {from: tickAt(450), until: tickAt(250), want: ErrCutOrder},
+		"zero length":           {from: tickAt(300), until: tickAt(300), want: ErrCutOrder},
+		"overlaps": {
+			from: tickAt(400), until: tickAt(600),
+			seed: &cut{from: tickAt(300), until: tickAt(500)}, want: ErrCutOverlap,
+		},
+		"touches": {
+			from: tickAt(400), until: tickAt(500),
+			seed: &cut{from: tickAt(300), until: tickAt(400)}, want: ErrCutOverlap,
+		},
+		"swallows": {
+			from: tickAt(200), until: tickAt(900),
+			seed: &cut{from: tickAt(300), until: tickAt(400)}, want: ErrCutOverlap,
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			net, _, _, _ := newTestNetwork(t, 1)
+			if err := net.addLink(LinkConfig{From: "B", To: "A", Latency: tickAt(20)}); err != nil {
+				t.Fatal(err)
+			}
+			if tc.seed != nil {
+				net.addCut(link, tc.seed.from, tc.seed.until)
+			}
+			if err := net.validateCut(link, tc.from, tc.until); !errors.Is(err, tc.want) {
+				t.Fatalf("validateCut() = %v, want %v", err, tc.want)
+			}
+		})
 	}
 }
