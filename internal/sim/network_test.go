@@ -21,6 +21,9 @@ func newTestNetwork(t *testing.T, seed uint64) (*network, *scheduler, *stubRecor
 	net.deliver = func(at domain.Tick, msg Message) {
 		*got = append(*got, delivery{at: at, msg: msg})
 	}
+	// The engine supplies this in a real run; without it a failed write inside a
+	// scheduled task would be lost, which is exactly what the hook exists for.
+	net.fault = func(err error) { t.Errorf("scheduled write failed: %v", err) }
 	return net, sched, rec, got
 }
 
