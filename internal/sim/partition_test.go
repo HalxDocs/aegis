@@ -209,3 +209,15 @@ func TestPartitionRejectsIncoherentIntervals(t *testing.T) {
 		})
 	}
 }
+
+func TestPartitionRequiresADeclaredLink(t *testing.T) {
+	e, _, _ := canonicalEngine(t)
+	err := e.PartitionAt("A", "C", tickAt(300), tickAt(400))
+	if !errors.Is(err, ErrUnknownLink) {
+		t.Fatalf("error = %v, want ErrUnknownLink", err)
+	}
+	err = e.PartitionAt("bad node", "A", tickAt(300), tickAt(400))
+	if err == nil {
+		t.Fatal("an invalid node id was accepted as a cut endpoint")
+	}
+}
