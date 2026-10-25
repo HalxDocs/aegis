@@ -76,6 +76,7 @@ func (s Spec) clone() Spec {
 	}
 	out.Links = slices.Clone(s.Links)
 	out.Observers = slices.Clone(s.Observers)
+	out.Partitions = slices.Clone(s.Partitions)
 	if s.Crash != nil {
 		crash := *s.Crash
 		out.Crash = &crash
