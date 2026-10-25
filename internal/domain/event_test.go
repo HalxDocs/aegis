@@ -22,6 +22,8 @@ func TestEventValidateAcceptsEachKind(t *testing.T) {
 			Kind: domain.KindSuspicionRaised, At: tick(570), Node: "A", Peer: "B", Reason: domain.ReasonHeartbeatTimeout,
 		},
 		"suspicion cleared": {Kind: domain.KindSuspicionCleared, At: tick(600), Node: "A", Peer: "B"},
+		"link partitioned":  {Kind: domain.KindLinkPartitioned, At: tick(300), Node: "B", Peer: "A"},
+		"link restored":     {Kind: domain.KindLinkRestored, At: tick(900), Node: "B", Peer: "A"},
 	}
 	for name, event := range events {
 		t.Run(name, func(t *testing.T) {
