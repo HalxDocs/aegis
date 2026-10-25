@@ -117,3 +117,35 @@ func TestPartitionLosesOnlyMessagesThatCrossIt(t *testing.T) {
 		})
 	}
 }
+
+// TestPartitionAnnouncesBothEnds checks the log explains itself: a dropped
+// message carries a reason, and the reason has a cause written down at the
+// instant it happened.
+func TestPartitionAnnouncesBothEnds(t *testing.T) {
+	e, rec, _ := canonicalEngine(t)
+	if err := e.PartitionAt("B", "A", tickAt(250), tickAt(450)); err != nil {
+		t.Fatalf("PartitionAt: %v", err)
+	}
+	if err := e.Start(); err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+	if err := e.Run(tickAt(600)); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+
+	partitioned := rec.ofKind(domain.KindLinkPartitioned)
+	if len(partitioned) != 1 {
+		t.Fatalf("partitioned events = %d, want 1", len(partitioned))
+	}
+	if got := partitioned[0]; got.At != tickAt(250) || got.Node != "B" || got.Peer != "A" {
+		t.Fatalf("partitioned event = %+v, want B->A at 250", got)
+	}
+	restored := rec.ofKind(domain.KindLinkRestored)
+	if len(restored) != 1 {
+		t.Fatalf("restored events = %d, want 1", len(restored))
+	}
+	if got := restored[0]; got.At != tickAt(450) || got.Node != "B" || got.Peer != "A" {
+		t.Fatalf("restored event = %+v, want B->A at 450", got)
+	}
+	rec.requireClean(t)
+}
