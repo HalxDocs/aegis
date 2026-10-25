@@ -3,6 +3,8 @@ package sim
 import (
 	"errors"
 	"fmt"
+	"slices"
+	"sort"
 
 	"github.com/HalxDocs/aegis/internal/domain"
 )
@@ -11,6 +13,17 @@ import (
 // must declare every link explicitly; an implicit default would make latency
 // and drop behaviour depend on who forgot to configure what.
 var ErrUnknownLink = errors.New("no link configured")
+
+var (
+	// ErrCutOrder is returned for a cut that ends at or before it begins.
+	ErrCutOrder = errors.New("cut does not end after it begins")
+
+	// ErrCutOverlap is returned when two cuts on one link overlap or touch.
+	// Separate cuts that meet at an instant describe one continuous outage
+	// while recording two of them, so the ambiguous case is refused rather
+	// than resolved by ordering.
+	ErrCutOverlap = errors.New("cut overlaps another cut on the same link")
+)
 
 // Message is one heartbeat in flight. Round is assigned by the sender and
 // increases monotonically, so a reader can count what an observer never heard.
@@ -121,6 +134,34 @@ func (n *network) addLink(cfg LinkConfig) error {
 	}
 	n.links[link] = wire{latency: cfg.Latency, dropPPM: cfg.DropPPM}
 	return nil
+}
+
+// validateCut rejects an outage the network cannot represent, without changing
+// anything. It is separate from addCut so a caller can fail before it schedules
+// the events that announce the cut.
+func (n *network) validateCut(link domain.Link, from, until domain.Tick) error {
+	if until <= from {
+		return fmt.Errorf("%w: %s cut %d..%d", ErrCutOrder, link, from, until)
+	}
+	w, ok := n.links[link]
+	if !ok {
+		return fmt.Errorf("%w: %s", ErrUnknownLink, link)
+	}
+	for _, existing := range w.cuts {
+		if existing.from <= until && from <= existing.until {
+			return fmt.Errorf("%w: %s cut %d..%d meets %d..%d",
+				ErrCutOverlap, link, from, until, existing.from, existing.until)
+		}
+	}
+	return nil
+}
+
+// addCut records a validated outage, keeping the link's cuts ordered by start.
+func (n *network) addCut(link domain.Link, from, until domain.Tick) {
+	w := n.links[link]
+	at := sort.Search(len(w.cuts), func(i int) bool { return w.cuts[i].from > from })
+	w.cuts = slices.Insert(w.cuts, at, cut{from: from, until: until})
+	n.links[link] = w
 }
 
 // send puts a message on the wire at the given virtual time.
