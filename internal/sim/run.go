@@ -61,3 +61,43 @@ func (e *Engine) CrashAt(at domain.Tick, id domain.NodeID) error {
 	}
 	return nil
 }
+
+// PartitionAt cuts one direction of a link for a fixed interval and records both
+// ends of the outage.
+//
+// Only from->to stops working: the return path keeps carrying messages, so the
+// two ends of one link disagree about who is alive. That asymmetry is the point
+// of a one-way cut, and it is why a cut is never expressed as "the link is
+// down".
+//
+// Both ends are scheduled like any other event, so they land in the log in
+// timestamp order alongside the messages they interrupt. A cut that begins in
+// the past is rejected rather than applied retroactively, and the interval is
+// validated before anything is scheduled so a rejected cut leaves no trace.
+func (e *Engine) PartitionAt(from, to domain.NodeID, at, until domain.Tick) error {
+	link, err := domain.NewLink(from, to)
+	if err != nil {
+		return err
+	}
+	if err := e.net.validateCut(link, at, until); err != nil {
+		return fmt.Errorf("partition %s: %w", link, err)
+	}
+	if at < e.sched.now {
+		return fmt.Errorf("%w: cut at %d, now %d", ErrScheduleInPast, at, e.sched.now)
+	}
+	e.net.addCut(link, at, until)
+	for _, mark := range []struct {
+		at   domain.Tick
+		kind domain.Kind
+	}{
+		{at, domain.KindLinkPartitioned},
+		{until, domain.KindLinkRestored},
+	} {
+		if _, err := e.sched.At(mark.at, func() {
+			e.fail(e.record(domain.Event{At: mark.at, Kind: mark.kind, Node: link.From, Peer: link.To}))
+		}); err != nil {
+			return fmt.Errorf("schedule %s of %s at %d: %w", mark.kind, link, mark.at, err)
+		}
+	}
+	return nil
+}
