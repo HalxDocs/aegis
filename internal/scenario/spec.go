@@ -208,3 +208,56 @@ func NodeCrash() Spec {
 		Horizon: domain.TickFrom(1200 * time.Millisecond),
 	}
 }
+
+// OneWayPartition is the canonical Milestone 2 scenario.
+//
+// Nothing crashes. A and B heartbeat each other every 100 ms and C watches B, so
+// every node is running for the whole run. At 300 ms the B->A direction is cut
+// and at 900 ms it is repaired; the A->B direction is untouched throughout.
+//
+// The result is the first history in which nobody is broken and somebody is
+// wrong:
+//
+//   - A stops hearing B, waits its full 350 ms and suspects B at 570 ms.
+//   - B keeps hearing A the whole time and never doubts it.
+//   - C, on its own link, keeps hearing B and never doubts anything.
+//
+// Repairing the path at 900 ms does not repair the belief. A only changes its
+// mind at 920 ms, when the first heartbeat after the repair actually arrives:
+// 350 ms of suspicion against a node that was never down. That is the milestone
+// in one number — trust is made of evidence, not of topology.
+func OneWayPartition() Spec {
+	return Spec{
+		Name: "one-way-partition",
+		Nodes: []sim.NodeConfig{
+			{
+				ID:             "A",
+				HeartbeatEvery: domain.TickFrom(100 * time.Millisecond),
+				Peers:          []domain.NodeID{"B"},
+			},
+			{
+				ID:             "B",
+				HeartbeatEvery: domain.TickFrom(100 * time.Millisecond),
+				Peers:          []domain.NodeID{"A", "C"},
+			},
+			{ID: "C"},
+		},
+		Links: []sim.LinkConfig{
+			{From: "A", To: "B", Latency: domain.TickFrom(20 * time.Millisecond)},
+			{From: "B", To: "A", Latency: domain.TickFrom(20 * time.Millisecond)},
+			{From: "B", To: "C", Latency: domain.TickFrom(25 * time.Millisecond)},
+		},
+		Observers: []ObserverSpec{
+			{Observer: "A", Target: "B", Timeout: domain.TickFrom(350 * time.Millisecond)},
+			{Observer: "B", Target: "A", Timeout: domain.TickFrom(350 * time.Millisecond)},
+			{Observer: "C", Target: "B", Timeout: domain.TickFrom(350 * time.Millisecond)},
+		},
+		Partitions: []PartitionSpec{
+			{From: "B", To: "A", At: domain.TickFrom(300 * time.Millisecond), Until: domain.TickFrom(900 * time.Millisecond)},
+		},
+		// The horizon sits just past the last arrival, so the run ends with an
+		// empty wire: every message in the log has an outcome, and none of them
+		// is still on a path when the history closes.
+		Horizon: domain.TickFrom(1150 * time.Millisecond),
+	}
+}
