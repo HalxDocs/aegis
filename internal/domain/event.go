@@ -122,6 +122,16 @@ func (e Event) Validate() error {
 		if e.Peer != "" {
 			return fmt.Errorf("%w: %s must not name a peer", ErrInvalidEvent, e.Kind)
 		}
+	case KindLinkPartitioned, KindLinkRestored:
+		if err := e.Peer.Validate(); err != nil {
+			return fmt.Errorf("%w: %s requires a peer: %w", ErrInvalidEvent, e.Kind, err)
+		}
+		if e.Round != 0 {
+			return fmt.Errorf("%w: %s must not name a round", ErrInvalidEvent, e.Kind)
+		}
+		if e.Reason != "" {
+			return fmt.Errorf("%w: %s must not carry a reason", ErrInvalidEvent, e.Kind)
+		}
 	case KindHeartbeatSent, KindMessageDropped, KindHeartbeatReceived:
 		if err := e.Peer.Validate(); err != nil {
 			return fmt.Errorf("%w: %s requires a peer: %w", ErrInvalidEvent, e.Kind, err)
