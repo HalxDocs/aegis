@@ -76,6 +76,9 @@ const (
 
 	// ReasonHeartbeatTimeout means a heartbeat deadline expired with no message.
 	ReasonHeartbeatTimeout = "heartbeat_timeout"
+
+	// ReasonPartition means the path was cut while the message was on it.
+	ReasonPartition = "partition"
 )
 
 // Event is one entry in the append-only history. It carries virtual time only:
