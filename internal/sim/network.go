@@ -109,6 +109,10 @@ type network struct {
 	sched   domain.Scheduler
 	rec     EventRecorder
 	deliver func(at domain.Tick, msg Message)
+
+	// fault reports a write that failed inside a scheduled task. A task has no
+	// caller to return an error to, so the engine hands its own Fail here.
+	fault func(error)
 }
 
 func newNetwork(sched domain.Scheduler, rec EventRecorder, rng *rng) *network {
