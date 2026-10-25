@@ -30,6 +30,22 @@ type CrashSpec struct {
 	At   domain.Tick
 }
 
+// PartitionSpec is a scheduled one-way outage of a declared link.
+//
+// The interval is half-open: the path is unusable from At up to, but not
+// including, Until. Only the From->To direction is affected, which is what makes
+// the two ends of one link disagree about who is alive.
+//
+// Everything about the interval itself — that it ends after it begins, that it
+// does not overlap another cut, that the link exists — is checked by the
+// simulator. A scenario only resolves names.
+type PartitionSpec struct {
+	From  domain.NodeID
+	To    domain.NodeID
+	At    domain.Tick
+	Until domain.Tick
+}
+
 // Spec describes one run.
 //
 // Nodes and links reuse the simulator's configuration types so a scenario
