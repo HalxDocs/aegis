@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/HalxDocs/aegis/internal/domain"
+	"github.com/HalxDocs/aegis/internal/sim"
 )
 
 // TestOneWayPartitionBreaksNobodyAndStillFoolsSomebody is the milestone's claim:
@@ -151,6 +152,49 @@ func TestPartitionNamesMustResolve(t *testing.T) {
 			mutate(&spec)
 			if _, err := Run(spec, 1); !errors.Is(err, ErrInvalidSpec) {
 				t.Fatalf("Run() = %v, want ErrInvalidSpec", err)
+			}
+		})
+	}
+}
+
+func TestCutIntervalRulesStayWithTheSimulator(t *testing.T) {
+	// The scenario resolves names; the interval itself is the network's rule, so
+	// the error has to come from there rather than from a second copy of it.
+	cases := map[string]struct {
+		mutate func(*Spec)
+		want   error
+	}{
+		"empty interval": {
+			mutate: func(s *Spec) { s.Partitions[0].Until = s.Partitions[0].At },
+			want:   sim.ErrCutOrder,
+		},
+		"reversed interval": {
+			mutate: func(s *Spec) { s.Partitions[0].Until = tick(100) },
+			want:   sim.ErrCutOrder,
+		},
+		"overlapping cuts": {
+			mutate: func(s *Spec) {
+				s.Partitions = append(s.Partitions, PartitionSpec{
+					From: "B", To: "A", At: tick(800), Until: tick(1000),
+				})
+			},
+			want: sim.ErrCutOverlap,
+		},
+		"undeclared link": {
+			mutate: func(s *Spec) { s.Partitions[0].From, s.Partitions[0].To = "C", "A" },
+			want:   sim.ErrUnknownLink,
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			spec := OneWayPartition()
+			tc.mutate(&spec)
+			_, err := Run(spec, 1)
+			if !errors.Is(err, tc.want) {
+				t.Fatalf("Run() = %v, want %v", err, tc.want)
+			}
+			if errors.Is(err, ErrInvalidSpec) {
+				t.Fatalf("error = %v, want the simulator's verdict, not the spec's", err)
 			}
 		})
 	}
