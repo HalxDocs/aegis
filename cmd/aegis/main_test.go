@@ -121,6 +121,7 @@ func TestDetailCoversEveryEventKind(t *testing.T) {
 		"dropped":         {domain.Event{Kind: domain.KindMessageDropped, Node: "B", Peer: "A", Round: 3, Reason: domain.ReasonDropPolicy}, "B->A round 3 (drop_policy)"},
 		"suspicion":       {domain.Event{Kind: domain.KindSuspicionRaised, Node: "B", Peer: "A", Reason: domain.ReasonHeartbeatTimeout}, "B distrusted by A (heartbeat_timeout)"},
 		"suspicion clear": {domain.Event{Kind: domain.KindSuspicionCleared, Node: "B", Peer: "A"}, "B trusted again by A"},
+		"partitioned":     {domain.Event{Kind: domain.KindLinkPartitioned, Node: "B", Peer: "A"}, "B->A path cut (one way)"},
 		"unknown":         {domain.Event{Kind: domain.Kind("invented")}, ""},
 	}
 	for name, tc := range cases {
