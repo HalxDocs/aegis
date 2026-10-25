@@ -77,6 +77,49 @@ func TestRunTableShowsTheFailure(t *testing.T) {
 	}
 }
 
+func TestRunPartitionScenario(t *testing.T) {
+	stdout, stderr, err := exec(t, "run", "--scenario", "one-way-partition", "--format", "table")
+	if err != nil {
+		t.Fatalf("run: %v", err)
+	}
+	if stderr != "" {
+		t.Fatalf("stderr = %q, want empty", stderr)
+	}
+	for _, want := range []string{
+		"B->A path cut (one way)",
+		"B->A path restored",
+		"B distrusted by A (heartbeat_timeout)",
+		"B trusted again by A",
+		"message_dropped",
+		"A      running",
+		"reports  1",
+	} {
+		if !strings.Contains(stdout, want) {
+			t.Fatalf("table output is missing %q:\n%s", want, stdout)
+		}
+	}
+
+	// The table is a rendering; the JSONL is the artifact. They must agree.
+	jsonl, _, err := exec(t, "run", "--scenario", "one-way-partition", "--format", "jsonl")
+	if err != nil {
+		t.Fatalf("run: %v", err)
+	}
+	res, err := scenario.Run(scenario.OneWayPartition(), 0)
+	if err != nil {
+		t.Fatalf("scenario.Run: %v", err)
+	}
+	var want bytes.Buffer
+	if err := res.Log.WriteJSONL(&want); err != nil {
+		t.Fatalf("WriteJSONL: %v", err)
+	}
+	if jsonl != want.String() {
+		t.Fatalf("CLI output differs from the recorded history:\n%s", jsonl)
+	}
+	if lines := strings.Count(jsonl, "\n"); lines != 75 {
+		t.Fatalf("lines = %d, want the 75-event partition fixture", lines)
+	}
+}
+
 func TestRunRejectsUnknownInputs(t *testing.T) {
 	cases := map[string][]string{
 		"no command":       {},
