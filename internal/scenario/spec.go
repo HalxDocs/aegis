@@ -53,12 +53,13 @@ type PartitionSpec struct {
 // a scenario with no crash is how the baseline "nothing goes wrong" run is
 // expressed.
 type Spec struct {
-	Name      string
-	Nodes     []sim.NodeConfig
-	Links     []sim.LinkConfig
-	Observers []ObserverSpec
-	Crash     *CrashSpec
-	Horizon   domain.Tick
+	Name       string
+	Nodes      []sim.NodeConfig
+	Links      []sim.LinkConfig
+	Observers  []ObserverSpec
+	Crash      *CrashSpec
+	Partitions []PartitionSpec
+	Horizon    domain.Tick
 }
 
 // clone returns a snapshot that shares no mutable state with the receiver.
