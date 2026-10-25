@@ -39,6 +39,14 @@ func Run(spec Spec, seed uint64) (Result, error) {
 		}
 	}
 
+	// Cuts are scheduled before the history opens, so a rejected cut cannot
+	// leave a half-written log behind.
+	for _, cut := range spec.Partitions {
+		if err := engine.PartitionAt(cut.From, cut.To, cut.At, cut.Until); err != nil {
+			return Result{}, fmt.Errorf("scenario %s: %w", spec.Name, err)
+		}
+	}
+
 	observers := make([]*detector.Detector, 0, len(spec.Observers))
 	for _, o := range spec.Observers {
 		det, err := detector.New(detector.Config{
