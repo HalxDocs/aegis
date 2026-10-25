@@ -5,9 +5,12 @@
 Aegis is a platform for reasoning about failure in distributed systems. Every recovery action must be justified by
 observable evidence, constrained by safety rules, and verified afterwards.
 
-Milestone 1 — the *failure lab* — is a deterministic discrete-event simulator. It models three nodes on a virtual
-clock, exchanges heartbeats over links with different latencies, crashes one node, and shows that the surviving
-observers only *suspect* the failure after their own heartbeat timeouts. It does not recover anything yet.
+The *failure lab* is a deterministic discrete-event simulator. It models nodes on a virtual clock, exchanges
+heartbeats over links with different latencies, and records what every layer knew and when.
+
+Milestone 1 crashes one node and shows that the survivors only *suspect* it after their own heartbeat timeouts.
+Milestone 2 cuts one direction of a link and shows the harder case: nobody is broken, and two observers of the same
+node still disagree, because trust is made of evidence rather than topology.
 
 The simulator owns ground truth. Observers never see it.
 
