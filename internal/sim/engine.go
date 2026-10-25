@@ -82,6 +82,7 @@ func NewEngine(cfg EngineConfig) (*Engine, error) {
 	}
 	e.net = newNetwork(e.sched, cfg.Recorder, newRNG(cfg.Seed))
 	e.net.deliver = e.deliver
+	e.net.fault = e.fail
 	return e, nil
 }
 
