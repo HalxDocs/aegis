@@ -34,6 +34,25 @@ $ go run ./cmd/aegis run --scenario node-crash --format table
 Suspicion latency is 355 ms, not the configured 350 ms, because the last evidence arrived 5 ms after the crash.
 That gap is the milestone: a fact and a belief about that fact are different things, and the log records both.
 
+## What the partition run shows
+
+```
+$ go run ./cmd/aegis run --scenario one-way-partition --format table
+```
+
+| t | event |
+| --- | --- |
+| 0 ms | A, B, C start; A and B heartbeat each other, C watches B |
+| **300 ms** | **the B->A direction is cut; the A->B direction keeps working** |
+| 300–800 ms | A never hears B again; B keeps hearing A and C keeps hearing B |
+| 570 ms | A stops trusting B |
+| **900 ms** | **the path is repaired** |
+| 920 ms | A trusts B again, when the first heartbeat after the repair arrives |
+| 1150 ms | horizon: every node running, one false report, one observer wrong for 350 ms |
+
+Nothing in this run is down. A one-way cut is the first failure that produces disagreement without a failure:
+B is alive and knows it, C can see it, and A is right about everything it can observe.
+
 ## Status
 
 Milestone 1 is complete. See [doc_m1.md](doc_m1.md) for every engineering decision, the risks considered, the
