@@ -70,10 +70,11 @@ real concurrency inside the simulation. A recovery loop that guesses would be wo
 
 ```bash
 make check                                                      # gofmt, vet, build, tests, race detector
-make replay                                                     # same scenario twice, byte-for-byte
+make replay                                                     # every scenario twice, byte-for-byte
 make demo                                                       # human-readable event log
 
 go run ./cmd/aegis run --scenario node-crash --format jsonl      # canonical machine-readable log
+go run ./cmd/aegis run --scenario one-way-partition --format table
 go run ./cmd/aegis run --scenario node-crash --seed 7            # seed is an input, not a global
 ```
 
@@ -88,8 +89,8 @@ internal/domain         core vocabulary: virtual time, ids, node and belief stat
 internal/sim            virtual clock, deterministic scheduler, network, nodes, engine
 internal/detector       observer-side suspicion from heartbeat timeouts
 internal/observability  append-only event history and JSONL encoding
-internal/scenario       scenario specification, the canonical crash fixture, the runner
-docs/                   the milestone plan
+internal/scenario       scenario specifications, golden fixtures, the runner
+docs/                   the milestone plans
 ```
 
 The dependency rule is one-way: `cmd` and `scenario` may know every component; the simulator knows the domain; the
