@@ -202,12 +202,17 @@ func (n *network) send(at domain.Tick, msg Message) error {
 	if !dropped {
 		return nil
 	}
+	return n.recordDrop(at, msg, domain.ReasonDropPolicy)
+}
+
+// recordDrop writes the outcome of a message that never reached its receiver.
+func (n *network) recordDrop(at domain.Tick, msg Message, reason string) error {
 	return n.rec.Record(domain.Event{
 		At:     at,
 		Kind:   domain.KindMessageDropped,
 		Node:   msg.From,
 		Peer:   msg.To,
 		Round:  msg.Round,
-		Reason: domain.ReasonDropPolicy,
+		Reason: reason,
 	})
 }
