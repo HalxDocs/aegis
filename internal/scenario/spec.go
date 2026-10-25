@@ -159,6 +159,21 @@ func (s Spec) validate() error {
 			return fmt.Errorf("%w: crash at %d is in the past", ErrInvalidSpec, s.Crash.At)
 		}
 	}
+
+	for _, p := range s.Partitions {
+		if err := p.From.Validate(); err != nil {
+			return fmt.Errorf("%w: partition: %w", ErrInvalidSpec, err)
+		}
+		if err := p.To.Validate(); err != nil {
+			return fmt.Errorf("%w: partition target: %w", ErrInvalidSpec, err)
+		}
+		if _, ok := nodes[p.From]; !ok {
+			return fmt.Errorf("%w: partition starts at unconfigured node %s", ErrInvalidSpec, p.From)
+		}
+		if _, ok := nodes[p.To]; !ok {
+			return fmt.Errorf("%w: partition ends at unconfigured node %s", ErrInvalidSpec, p.To)
+		}
+	}
 	return nil
 }
 
