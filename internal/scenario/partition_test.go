@@ -97,3 +97,43 @@ func TestRepairingThePathDoesNotRepairTheBelief(t *testing.T) {
 		t.Fatalf("A received at %v, want %v", arrivals, want)
 	}
 }
+
+// TestPartitionLeavesTheReturnPathWorking checks the shape of the loss: only the
+// cut direction loses messages, and only inside the cut.
+func TestPartitionLeavesTheReturnPathWorking(t *testing.T) {
+	res := mustRun(t, OneWayPartition(), 1)
+
+	sentByA, receivedByB, drops := 0, 0, 0
+	for _, ev := range res.Log.Events() {
+		switch ev.Kind {
+		case domain.KindHeartbeatSent:
+			if ev.Node == "A" {
+				sentByA++
+			}
+		case domain.KindHeartbeatReceived:
+			if ev.Node == "A" {
+				receivedByB++
+			}
+		case domain.KindMessageDropped:
+			drops++
+			if ev.Node != "B" || ev.Peer != "A" {
+				t.Fatalf("%s->%s was dropped; only B->A is cut", ev.Node, ev.Peer)
+			}
+			if ev.Reason != domain.ReasonPartition {
+				t.Fatalf("drop reason = %q, want %q", ev.Reason, domain.ReasonPartition)
+			}
+			if ev.At < tick(300) || ev.At >= tick(900) {
+				t.Fatalf("message dropped at %d, outside the cut", ev.At)
+			}
+		}
+	}
+	if sentByA != receivedByB {
+		t.Fatalf("A sent %d rounds and B received %d: the return path was cut too", sentByA, receivedByB)
+	}
+	if sentByA != 11 {
+		t.Fatalf("A sent %d rounds in 1.15s at 100ms, want 11", sentByA)
+	}
+	if drops != 6 {
+		t.Fatalf("drops = %d, want the six rounds sent during the cut", drops)
+	}
+}
