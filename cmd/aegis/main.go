@@ -87,7 +87,9 @@ func lookup(name string) (scenario.Spec, error) {
 	switch name {
 	case "node-crash":
 		return scenario.NodeCrash(), nil
+	case "one-way-partition":
+		return scenario.OneWayPartition(), nil
 	default:
-		return scenario.Spec{}, fmt.Errorf("unknown scenario %q (available: node-crash)", name)
+		return scenario.Spec{}, fmt.Errorf("unknown scenario %q (available: node-crash, one-way-partition)", name)
 	}
 }
