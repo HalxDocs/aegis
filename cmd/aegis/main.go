@@ -1,4 +1,4 @@
-// Command aegis runs one Milestone 1 scenario and prints its event history.
+// Command aegis runs one scenario and prints its event history.
 //
 // The table view is derived from the recorded events after the run; it is not a
 // second source of truth. JSONL is the canonical output, so the default format
@@ -18,7 +18,7 @@ import (
 const usage = `usage: aegis run [flags]
 
 flags:
-  -scenario string  scenario to run (default "node-crash")
+  -scenario string  scenario to run: node-crash or one-way-partition (default "node-crash")
   -seed uint        seed for deterministic decisions (default 0)
   -format string    output format: jsonl or table (default "jsonl")
 `
