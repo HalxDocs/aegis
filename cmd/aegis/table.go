@@ -38,6 +38,10 @@ func detail(ev domain.Event) string {
 		return fmt.Sprintf("%s->%s round %d", ev.Node, ev.Peer, ev.Round)
 	case domain.KindMessageDropped:
 		return fmt.Sprintf("%s->%s round %d (%s)", ev.Node, ev.Peer, ev.Round, ev.Reason)
+	case domain.KindLinkPartitioned:
+		return fmt.Sprintf("%s->%s path cut (one way)", ev.Node, ev.Peer)
+	case domain.KindLinkRestored:
+		return fmt.Sprintf("%s->%s path restored", ev.Node, ev.Peer)
 	case domain.KindSuspicionRaised:
 		return fmt.Sprintf("%s distrusted by %s (%s)", ev.Node, ev.Peer, ev.Reason)
 	case domain.KindSuspicionCleared:
