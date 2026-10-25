@@ -56,3 +56,43 @@ The fixture is [internal/scenario/testdata/one-way-partition.jsonl](../internal/
 
 Nothing in the M1 path changed shape: `--scenario node-crash` still produces the same 16 events, byte for byte, and
 `TestCanonicalScenarioReproducesTheExpectedTimeline` was not touched.
+
+## 4. Decisions
+
+**D1 — A cut is a schedule, not a flag on a link.** `wire.cuts` holds intervals; the runtime task only records the
+event. The alternative — a boolean that a task flips — makes the answer depend on which task ran first at an instant,
+and this milestone exists to remove that class of ambiguity.
+
+**D2 — A message is lost if its transit meets the cut.** The test is the intersection of the closed transit
+`[send, arrive]` with the open cut `(from, until)`:
+
+| transit | cut | outcome | why |
+| --- | --- | --- | --- |
+| 300 → 320 | 300 … 900 | lost | it departs as the path dies |
+| 280 → 300 | 300 … 900 | delivered | it arrives as the path dies |
+| 890 → 910 | 300 … 900 | lost | it is on the wire when the path dies |
+| 900 → 920 | 300 … 900 | delivered | it departs as the path heals |
+| 500 → 500 | 300 … 900 | lost | a zero-latency message inside the cut |
+
+The cut is open at both ends precisely so no boundary needs a tie-break. `TestCutCrossesOnlyWhenTheTransitMeetsIt`
+pins all ten cases.
+
+**D3 — The loss is recorded at the arrival instant, not the send.** The sender already believes it sent, which is the
+M1 principle "sent mail is not recalled". Recording at the send would put a `message_dropped` at 290 ms in a log whose
+cut begins at 300 ms, and would claim knowledge the network does not have yet.
+
+**D4 — One direction is one link.** There is no "the link is down" concept, so a scenario that wants both directions
+declares two cuts. This is not pedantry: the whole scenario is a run where the two ends of one physical path disagree,
+and a symmetric cut would delete the claim.
+
+**D5 — Cuts that overlap or touch are refused.** Two cuts meeting at an instant describe one continuous outage while
+writing `link_restored` and `link_partitioned` at the same tick. Rejecting the case is cheaper than explaining the
+output.
+
+**D6 — A report outlives the suspicion.** A's `failure_report` from 570 ms stays in `Result.Reports` after A recovers at
+920 ms. A report is evidence about what an observer concluded, not a claim about the present; deleting it on recovery
+would destroy the only record of the mistake this milestone is about.
+
+**D7 — The cut is in the log.** `link_partitioned` and `link_restored` explain the drops. At 300 ms the partition event
+precedes the heartbeats because it was scheduled during configuration, before any timer was armed — a stable ordering
+by construction rather than by luck.
