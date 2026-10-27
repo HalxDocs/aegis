@@ -1,8 +1,9 @@
-// Command aegis runs one scenario and prints its event history.
+// Command aegis runs one scenario and prints its event history, or explains
+// why one event in it happened.
 //
-// The table view is derived from the recorded events after the run; it is not a
-// second source of truth. JSONL is the canonical output, so the default format
-// is the one a later milestone reads.
+// The table view and the explanation are both derived from the recorded events
+// after the run; neither is a second source of truth. JSONL is the canonical
+// output, so the default format is the one a later milestone reads.
 package main
 
 import (
