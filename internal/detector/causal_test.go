@@ -64,3 +64,35 @@ func TestASuspicionCitesTheEvidenceItsDeadlineMeasured(t *testing.T) {
 		t.Fatalf("suspicion cites %v, want the last receipt %d", raised[0].Causes, want)
 	}
 }
+
+func TestARecoveryCitesTheMessageThatClearedIt(t *testing.T) {
+	h := rootedHarness(t, "A", tickAt(350))
+	h.mustWatch(t, "B")
+	h.sched.run(tickAt(120), true)
+	if err := h.det.HeartbeatReceived(tickAt(120), "B", "A", 1, 9); err != nil {
+		t.Fatal(err)
+	}
+	h.sched.run(tickAt(480), true)
+	if n := h.rec.count(domain.KindSuspicionRaised); n != 1 {
+		t.Fatalf("suspicion events = %d, want 1 before recovery", n)
+	}
+	h.sched.run(tickAt(600), true)
+	if err := h.det.HeartbeatReceived(tickAt(600), "B", "A", 2, 10); err != nil {
+		t.Fatal(err)
+	}
+
+	cleared := h.rec.ofKind(domain.KindSuspicionCleared)
+	if len(cleared) != 1 {
+		t.Fatalf("recoveries = %d, want 1", len(cleared))
+	}
+	receipts := h.rec.ofKind(domain.KindHeartbeatReceived)
+	last := receipts[len(receipts)-1]
+	if want := h.rec.refOf(last); len(cleared[0].Causes) != 1 || cleared[0].Causes[0] != want {
+		t.Fatalf("recovery cites %v, want the receipt at 600 ms (%d)", cleared[0].Causes, want)
+	}
+	raised := h.rec.ofKind(domain.KindSuspicionRaised)[0]
+	if cleared[0].Causes[0] <= raised.Causes[0] {
+		t.Fatalf("the recovery cites %v, which is not after the evidence the suspicion cited %v",
+			cleared[0].Causes, raised.Causes)
+	}
+}

@@ -189,10 +189,11 @@ func (d *Detector) HeartbeatReceived(at domain.Tick, from, to domain.NodeID, rou
 	}
 	if m.obs.Belief == domain.BeliefSuspected && next.Belief == domain.BeliefHealthy {
 		if _, err := d.rec.Record(domain.Event{
-			At:   at,
-			Kind: domain.KindSuspicionCleared,
-			Node: from,
-			Peer: to,
+			At:     at,
+			Kind:   domain.KindSuspicionCleared,
+			Node:   from,
+			Peer:   to,
+			Causes: []domain.Ref{receipt},
 		}); err != nil {
 			return fmt.Errorf("detector %s: record recovery of %s: %w", d.observer, from, err)
 		}
