@@ -229,7 +229,7 @@ func (n *network) send(at domain.Tick, msg Message, cause domain.Ref) (domain.Re
 	if !dropped {
 		return ref, nil
 	}
-	return ref, n.recordDrop(at, msg, domain.ReasonDropPolicy)
+	return ref, n.recordDrop(at, msg, ref, nil, domain.ReasonDropPolicy)
 }
 
 // arrive is what becomes of a message that was accepted by the sender.
@@ -238,7 +238,7 @@ func (n *network) arrive(at domain.Tick, msg Message, sent domain.Ref, lost bool
 		n.deliver(at, msg, sent)
 		return
 	}
-	if err := n.recordDrop(at, msg, domain.ReasonPartition); err != nil {
+	if err := n.recordDrop(at, msg, sent, nil, domain.ReasonPartition); err != nil {
 		if n.fault != nil {
 			n.fault(err)
 		}
@@ -246,7 +246,7 @@ func (n *network) arrive(at domain.Tick, msg Message, sent domain.Ref, lost bool
 }
 
 // recordDrop writes the outcome of a message that never reached its receiver.
-func (n *network) recordDrop(at domain.Tick, msg Message, reason string) error {
+func (n *network) recordDrop(at domain.Tick, msg Message, sent domain.Ref, crossing *cut, reason string) error {
 	_, err := n.rec.Record(domain.Event{
 		At:     at,
 		Kind:   domain.KindMessageDropped,
@@ -254,6 +254,7 @@ func (n *network) recordDrop(at domain.Tick, msg Message, reason string) error {
 		Peer:   msg.To,
 		Round:  msg.Round,
 		Reason: reason,
+		Causes: []domain.Ref{sent},
 	})
 	return err
 }
