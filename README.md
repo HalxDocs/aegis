@@ -82,11 +82,13 @@ message crosses it. See [doc_m3.md](doc_m3.md) for the contract and its limits.
 
 ## Status
 
-Milestones 1 and 2 are complete. See [doc_m1.md](doc_m1.md) and [doc_m2.md](doc_m2.md) for every engineering
-decision, the risks considered, the drift between plan and code, and the verification evidence behind each claim.
+Milestones 1, 2 and 3 are complete. See [doc_m1.md](doc_m1.md), [doc_m2.md](doc_m2.md) and [doc_m3.md](doc_m3.md)
+for every engineering decision, the risks considered, the drift between plan and code, and the verification
+evidence behind each claim.
 
-Deliberately absent so far: jitter, correlated loss, causal history, recovery, diagnosis, scenario files, and any
-real concurrency inside the simulation. A recovery loop that guesses would be worse than no recovery loop.
+Deliberately absent so far: jitter, correlated loss, recovery, diagnosis, scenario files, counterfactual
+comparison, and any real concurrency inside the simulation. A recovery loop that guesses would be worse than no
+recovery loop, and a graph that claimed to explain an absence would be worse than one that admits it cannot.
 
 ## Releases
 
@@ -109,10 +111,12 @@ moved in the API, the one decision worth arguing about, and what is still not mo
 make check                                                      # gofmt, vet, build, tests, race detector
 make replay                                                     # every scenario twice, byte-for-byte
 make demo                                                       # human-readable event log
+make explain                                                    # why A distrusted B, and what it rested on
 
 go run ./cmd/aegis run --scenario node-crash --format jsonl      # canonical machine-readable log
 go run ./cmd/aegis run --scenario one-way-partition --format table
 go run ./cmd/aegis run --scenario node-crash --seed 7            # seed is an input, not a global
+go run ./cmd/aegis explain -scenario one-way-partition -ref 61   # the reasons behind one event
 ```
 
 The JSONL log is the canonical artifact: one event per line, virtual timestamps only, sequence numbers assigned by
@@ -126,6 +130,7 @@ internal/domain         core vocabulary: virtual time, ids, node and belief stat
 internal/sim            virtual clock, deterministic scheduler, network, nodes, engine
 internal/detector       observer-side suspicion from heartbeat timeouts
 internal/observability  append-only event history and JSONL encoding
+internal/causal         the history read as a graph of reasons
 internal/scenario       scenario specifications, golden fixtures, the runner
 docs/                   the milestone plan and the five-minute talk
 ```
@@ -134,7 +139,8 @@ A spoken walkthrough of both runs, built to be delivered in five minutes, is in
 [docs/talk-five-minutes.md](docs/talk-five-minutes.md).
 
 The dependency rule is one-way: `cmd` and `scenario` may know every component; the simulator knows the domain; the
-detector knows only the domain, so it has no way to read ground truth.
+detector knows only the domain, so it has no way to read ground truth, and the causal explainer knows only the
+events, so it has no way to ask what really happened.
 
 ## Licence
 
