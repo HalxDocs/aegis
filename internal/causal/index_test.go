@@ -61,3 +61,13 @@ func TestNewRejectsAHistoryThatIsNotNumberedFromOne(t *testing.T) {
 		})
 	}
 }
+
+func TestNewRejectsAHistoryThatDoesNotOpenWithTheScenario(t *testing.T) {
+	events := sample()
+	events[0].Kind = domain.KindNodeStarted
+	events[0].Node = "A"
+	events[0].Scenario = ""
+	if _, err := New(events); !errors.Is(err, ErrNoRoot) {
+		t.Fatalf("error = %v, want ErrNoRoot", err)
+	}
+}
