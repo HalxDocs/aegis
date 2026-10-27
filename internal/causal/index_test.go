@@ -82,7 +82,7 @@ func TestNewRejectsAnEventWithNoCause(t *testing.T) {
 
 func TestNewRejectsCausesOutOfOrder(t *testing.T) {
 	events := sample()
-	events[4].Causes = []domain.Ref{3, 4}
+	events[4].Causes = []domain.Ref{4, 3}
 	if _, err := New(events); !errors.Is(err, ErrUnsortedCauses) {
 		t.Fatalf("error = %v, want ErrUnsortedCauses", err)
 	}
