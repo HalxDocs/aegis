@@ -113,3 +113,16 @@ func TestAnObserverThatNeverHeardAnythingCitesTheScenario(t *testing.T) {
 		t.Fatal("the harness received a message it did not expect")
 	}
 }
+
+func TestAReceiptCitesTheSendItAnswers(t *testing.T) {
+	h := rootedHarness(t, "A", tickAt(350))
+	h.mustWatch(t, "B")
+	h.sched.run(tickAt(120), true)
+	if err := h.det.HeartbeatReceived(tickAt(120), "B", "A", 1, 42); err != nil {
+		t.Fatal(err)
+	}
+	receipt := h.rec.ofKind(domain.KindHeartbeatReceived)[0]
+	if len(receipt.Causes) != 1 || receipt.Causes[0] != domain.Ref(42) {
+		t.Fatalf("receipt cites %v, want the send that was handed to it", receipt.Causes)
+	}
+}
