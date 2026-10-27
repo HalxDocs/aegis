@@ -98,6 +98,7 @@ moved in the API, the one decision worth arguing about, and what is still not mo
 | release | what it covers |
 | --- | --- |
 | [v0.2.0](https://github.com/HalxDocs/aegis/releases/tag/v0.2.0) — Milestone 2: one-way partitions | A cut as a schedule on the wire rather than a flag: `Engine.PartitionAt`, the `link_partitioned` and `link_restored` events, and the `one-way-partition` scenario with its 75-event golden fixture. Nothing crashes, and a node is still distrusted for 350 ms. |
+| Milestone 3 — causal history (untagged) | Every event cites the events that caused it, so the log is also a graph: `Event.Causes`, `Recorder.Record` handing back the reference it assigned, and a new `aegis explain` command. The crash explains no belief, and the repair explains nothing. See [doc_m3.md](doc_m3.md). |
 | Milestone 1 — node crash (untagged) | The foundation: virtual clock, deterministic scheduler, heartbeats over links with different latencies, observer-side timeouts, and the canonical 16-event `node-crash` run. See [doc_m1.md](doc_m1.md). |
 
 ## Requirements

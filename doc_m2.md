@@ -41,6 +41,10 @@ Final state: truth is `running` for all three; A believes B healthy (last seen 1
 The fixture is [internal/scenario/testdata/one-way-partition.jsonl](../internal/scenario/testdata/one-way-partition.jsonl),
 75 events, compared as bytes by `TestOneWayPartitionMatchesTheCommittedLog`.
 
+> **Changed in [Milestone 3](doc_m3.md).** Every event now carries a `causes` list, so the fixture was regenerated:
+> its bytes differ from the ones this milestone shipped, and its timeline does not. `TestOneWayPartitionMatchesTheCommittedLog`
+> still compares bytes; the timeline assertions were not edited.
+
 ## 3. What changed
 
 | File | Change |
