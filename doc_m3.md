@@ -147,3 +147,48 @@ Two consequences are worth stating plainly, because both are claims and both are
 
 The one thing that did not change is the timeline. Adding a field to every line changes the bytes of the fixture and
 nothing else: the events, their order, their timestamps and their reasons are the ones v0.2.0 produced.
+
+## 6. Decisions
+
+**D1 — A cause is the recorder's sequence number, not a second identity.**
+The recorder already gave every event a number, densely and in virtual-time order. Reusing it means a reference is
+also an ordering fact, so "recorded before" and "caused before" cannot disagree. *Rejected:* a separate event id
+allocated by the writers. Two counters have to be kept in step by hand, and the failure mode — a citation that
+resolves to the wrong event — is silent.
+
+**D2 — Causes are recorded when the event is written, not reconstructed afterwards.**
+The detector knows which receipt armed the deadline at the instant it arms it. A post-hoc reconstruction from
+timestamps ("the last receipt before this") would produce the same answer in the canonical runs and a different one
+in every interesting case, because the reason a deadline was set is not always the most recent event.
+
+**D3 — A cause list is sorted, unique, and may hold more than one entry.**
+A lost message has two independent reasons and flattening them loses information; leaving the order free would make
+two renderings of the same run differ by the order of two simultaneous causes. *Rejected:* a single parent with the
+other reason in the `reason` field, which is what the drop already had — it put prose where a reference belongs.
+
+**D4 — Exogenous events cite the scenario.**
+A crash and a cut are not caused by anything in the world; the script caused them. Pointing them at the scenario
+keeps them out of every observer's ancestry while keeping every event reachable from the root, so the two goals —
+"ground truth explains no belief" and "everything traces back to the run" — hold at the same time.
+
+**D5 — The deadline remembers the reference that armed it.**
+The monitor stores `evidence`, set to the receipt on every arrival and to the scenario when it is first armed. A
+suspicion cites that. The alternative — citing `LastSeen` by finding the receipt at that timestamp — would tempt a
+reader to think the graph was derived, and would break the moment two receipts shared a tick.
+
+**D6 — The repair cites the cut, and nothing cites the repair.**
+An outage is one object with two ends, so `link_restored` hangs off `link_partitioned`. This has a consequence
+worth stating: the repair is the second event in the history with no descendants at all, which is exactly the claim
+that repairing a path does not repair a belief.
+
+**D7 — The explainer lives in its own package and reads only the log.**
+`internal/causal` imports `domain` and the standard library. It cannot ask the simulator what happened, so it
+cannot produce an explanation that a reader of the JSONL could not produce. That is the same rule the detector
+follows for the same reason: knowledge has to come from the artifact.
+
+**D8 — The invariants of the graph are checked by the index, not by the recorder.**
+The recorder enforces the rules that are true event by event: a cause precedes its effect, references are real. The
+index enforces the rules that are only true of a whole history: one root, every event cited, every walk ending
+there. Putting the second set in the recorder would have meant asking it to know the future. *Rejected:* skipping
+the checks at write time entirely; every scenario run is validated with `Result.Causal()` in tests, so a writer
+that forgets a cause fails the build rather than the demonstration.
