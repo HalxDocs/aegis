@@ -156,3 +156,29 @@ func (i *Index) Ancestors(ref domain.Ref) ([]domain.Ref, error) {
 	slices.Sort(out)
 	return out, nil
 }
+
+// Descendants returns every event that cites ref, directly or through others,
+// in increasing order.
+func (i *Index) Descendants(ref domain.Ref) ([]domain.Ref, error) {
+	if _, ok := i.events[ref]; !ok {
+		return nil, fmt.Errorf("%w: %s", ErrUnknownRef, ref)
+	}
+	seen := make(map[domain.Ref]struct{})
+	var walk func(domain.Ref)
+	walk = func(at domain.Ref) {
+		for _, child := range i.children[at] {
+			if _, ok := seen[child]; ok {
+				continue
+			}
+			seen[child] = struct{}{}
+			walk(child)
+		}
+	}
+	walk(ref)
+	out := make([]domain.Ref, 0, len(seen))
+	for child := range seen {
+		out = append(out, child)
+	}
+	slices.Sort(out)
+	return out, nil
+}

@@ -147,3 +147,30 @@ func TestAncestorsWalkBackToTheRoot(t *testing.T) {
 		t.Fatalf("error = %v, want ErrUnknownRef", err)
 	}
 }
+
+func TestDescendantsAreTheEventsOneRefExplains(t *testing.T) {
+	idx, err := New(sample())
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := idx.Descendants(1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []domain.Ref{2, 3, 4, 5, 6}
+	if len(got) != len(want) {
+		t.Fatalf("descendants of the root = %v, want %v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("descendants of the root = %v, want %v", got, want)
+		}
+	}
+	got, err = idx.Descendants(4)
+	if err != nil || len(got) != 1 || got[0] != 5 {
+		t.Fatalf("descendants of the receipt = %v (err %v), want the suspicion alone", got, err)
+	}
+	if _, err := idx.Descendants(0); !errors.Is(err, ErrUnknownRef) {
+		t.Fatalf("error = %v, want ErrUnknownRef for the zero reference", err)
+	}
+}
