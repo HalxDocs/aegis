@@ -192,3 +192,64 @@ index enforces the rules that are only true of a whole history: one root, every 
 there. Putting the second set in the recorder would have meant asking it to know the future. *Rejected:* skipping
 the checks at write time entirely; every scenario run is validated with `Result.Causal()` in tests, so a writer
 that forgets a cause fails the build rather than the demonstration.
+
+## 7. Failure modes, and what stops them
+
+| failure | what it would look like | what stops it |
+| --- | --- | --- |
+| a cause that has not happened yet | a graph that points forwards, and an explanation that quotes the future | `Recorder.Record` returns `ErrFutureCause`; the index refuses the reference too |
+| an event that cites nothing | an ancestry that stops one step short of the root, with no sign that it did | `causal.New` returns `ErrUncaused`, and every scenario run is indexed in tests |
+| a cause outside the history | a walk that ends at a number that resolves to nothing | `causal.New` returns `ErrDanglingCause` |
+| a cause datestamped after its effect | an explanation that reads backwards in time while looking correct in sequence | `causal.New` returns `ErrFutureCause` when the cited event's tick is later |
+| a phantom suspicion | a belief that cites a message the observer never received | the detector only sets `evidence` from a receipt it recorded itself |
+| a crash in a belief's ancestry | an explanation that is right for the wrong reason, and impossible to falsify | a test asserts the crash has no descendants and appears in no suspicion's ancestry |
+| a repair in a belief's ancestry | the comfortable story: the path came back, so trust came back | a test asserts `link_restored` has no descendants, and the recovery cites the arrival |
+| two renderings of one run differing | non-deterministic output from a deterministic simulator | causes are sorted by reference; the JSONL is compared byte for byte by `make replay` |
+| a fixture regenerated over a regression | a committed log that hides a changed timeline behind a legitimate schema change | the timeline tests do not read the fixture; they assert the events, and were not edited |
+
+## 8. Known limitations
+
+**Absence is not an event.** In the partition run, A suspects B because no heartbeat arrived for 350 ms, and the cut
+is why none arrived. The graph does not say that. A's suspicion is descended from the last receipt at 220 ms and
+nothing else, because the cut produced no arrival to cite; it prevented one. The log explains why A acted and not
+why the world was quiet, and no amount of citation can close that gap without recording absences as events.
+
+**The graph records what a writer believed, not what is true.** A cause is checked for existence and order, never
+for correctness of judgement. A detector could cite an earlier receipt that did not arm its deadline and the graph
+would accept it; only the detector's own tests catch that class of mistake.
+
+**No counterfactuals.** The graph can say what happened and why. It cannot answer "would A have suspected B if the
+cut had not happened", which needs a second run and a comparison between runs that no part of this project does yet.
+
+**One run at a time.** References are per history. Two runs cannot be compared by reference, only by scenario, seed
+and virtual time, and nothing enforces that they are the same shape.
+
+**The explanation is a tree, not a proof.** It shows the reasons an event rests on. It does not show that those
+reasons were sufficient, and the same chain would be produced whether or not the writer's reasoning was sound.
+
+## 9. Verification
+
+```
+gofmt -l .          # empty
+go vet ./...        # empty
+go test ./...       # 7 packages, 217 test functions
+go test -race ./... # clean
+make replay         # node-crash: identical / one-way-partition: identical
+make check          # fmt, vet, build, test, race
+```
+
+Coverage is 93.1% overall: `causal` 96.4, `observability` 100, `sim` 94.9, `domain` 93.7, `detector` 91.7,
+`scenario` 89.4, `cmd` 87.8. The project is 8,809 lines of Go, 5,615 of them tests.
+
+What the tests establish, in the order the claims are made:
+
+- every run of every scenario, over seven seeds and with the lossy network on, indexes without error;
+- the crash and the repair have no descendants, and no suspicion or recovery is descended from either;
+- every suspicion of a dead node cites a receipt, and that receipt cites a send;
+- every drop inside the cut cites the cut and the send, in that order;
+- the committed fixture, read back from disk, explains event 61 as the receipt at 920 ms;
+- the CLI renders the crash run's suspicion chain, the partition run's recovery, and a two-parent drop, and the
+  first of those contains no crash.
+
+The fixture was regenerated once, in the commit that first wrote a cause. The timeline tests were not touched, and
+the 16-event canonical run still has the same 16 events in the same order at the same instants.
