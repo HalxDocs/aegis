@@ -68,6 +68,17 @@ func (r *Recorder) Record(ev domain.Event) (domain.Ref, error) {
 	return ref, nil
 }
 
+// Event returns the recorded event with the given reference.
+//
+// The bounds check is on the reference rather than on the slice index, so the
+// zero reference, which names nothing, cannot resolve to the first event.
+func (r *Recorder) Event(ref domain.Ref) (domain.Event, bool) {
+	if !ref.Valid() || uint64(ref) > uint64(len(r.events)) {
+		return domain.Event{}, false
+	}
+	return r.events[ref-1], true
+}
+
 // Events returns a copy of the history in sequence order.
 func (r *Recorder) Events() []domain.Event { return slices.Clone(r.events) }
 
