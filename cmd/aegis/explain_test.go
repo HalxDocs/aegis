@@ -27,10 +27,11 @@ func TestExplainWalksFromASuspicionToTheEvidence(t *testing.T) {
 	lines := strings.Split(strings.TrimSpace(out), "\n")
 	want := []string{
 		"14  570ms  suspicion_raised  B distrusted by A (heartbeat_timeout)",
-		"  <- 12  220ms  heartbeat_received  B->A round 2",
+		"<- 12  220ms  heartbeat_received  B->A round 2",
 		"    <- 9  200ms  heartbeat_sent  B->A round 2",
-		"      <- 3  0s  node_started  B started",
-		"        <- 1  0s  scenario_started  node-crash",
+		"        <- 5  100ms  heartbeat_sent  B->A round 1",
+		"            <- 3  0s  node_started  B started",
+		"                <- 1  0s  scenario_started  node-crash",
 	}
 	if len(lines) != len(want) {
 		t.Fatalf("lines = %d, want %d:\n%s", len(lines), len(want), out)
@@ -97,12 +98,19 @@ func TestExplainingADropShowsBothReasons(t *testing.T) {
 	if !strings.Contains(lines[0], "message_dropped") {
 		t.Fatalf("first line = %q, want the drop", lines[0])
 	}
-	// Both causes are one level down: the cut and the send.
-	if len(lines) < 3 {
-		t.Fatalf("the explanation has %d lines, want both branches:\n%s", len(lines), out)
+	// Both causes are one level down: the cut, then the send. Each branch is
+	// expanded in turn, so the send is not the second line.
+	branches := 0
+	for _, line := range lines {
+		if strings.HasPrefix(line, "<- ") {
+			branches++
+			if !strings.Contains(line, "link_partitioned") && !strings.Contains(line, "heartbeat_sent") {
+				t.Fatalf("top-level branch = %q, want the cut or the send", line)
+			}
+		}
 	}
-	if !strings.Contains(lines[1], "link_partitioned") || !strings.Contains(lines[2], "heartbeat_sent") {
-		t.Fatalf("branches = %q, %q; want the cut then the send", lines[1], lines[2])
+	if branches != 2 {
+		t.Fatalf("top-level branches = %d, want two:\n%s", branches, out)
 	}
 }
 

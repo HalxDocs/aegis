@@ -19,13 +19,13 @@ func writeExplanation(w io.Writer, exp *causal.Explanation, maxDepth int) error 
 	walk = func(node *causal.Explanation, level int) error {
 		prefix := ""
 		if level > 0 {
-			prefix = strings.Repeat("  ", level-1) + "<- "
+			prefix = strings.Repeat("    ", level-1) + "<- "
 		}
 		if _, err := fmt.Fprintf(w, "%s%s\n", prefix, describeEvent(node.Event)); err != nil {
 			return err
 		}
 		if maxDepth > 0 && level >= maxDepth && len(node.Causes) > 0 {
-			_, err := fmt.Fprintf(w, "%s...\n", strings.Repeat("  ", level+1))
+			_, err := fmt.Fprintf(w, "%s...\n", strings.Repeat("    ", level+1))
 			return err
 		}
 		for _, cause := range node.Causes {
