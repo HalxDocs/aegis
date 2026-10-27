@@ -127,3 +127,23 @@ Two consequences are worth stating plainly, because both are claims and both are
 - **A cut is not inert.** It is cited by every message it swallowed, which is what makes a lost heartbeat
   explicable. The cut is visible to the *network*, never to an observer, and the graph keeps that distinction: the
   drops descend from it, the beliefs do not.
+
+## 5. What changed
+
+| file | change |
+| --- | --- |
+| `internal/domain/ref.go` | `Ref`: a reference to a recorded event, valid only above zero |
+| `internal/domain/event.go` | `Event.Causes`, with rules for zero references, increasing order and a root that cites nothing |
+| `internal/observability/recorder.go` | `Record` returns the reference it assigned and refuses a cause that names the future; `Event(ref)` looks one up; `ReadJSONL` reads the artifact back |
+| `internal/sim/engine.go` | `Open`, `Close`, `Root`; the receiver is handed the reference of the delivery |
+| `internal/sim/node.go` | the start and the crash cite the scenario; each heartbeat cites the previous send on its direction |
+| `internal/sim/network.go` | sends carry a cause and return a reference; a cut remembers the event that announced it; a drop cites the send and, inside a cut, the cut |
+| `internal/sim/run.go` | a partition records its two ends as a chain rather than as two unrelated events |
+| `internal/detector` | a monitor remembers the reference that armed its deadline; suspicion and recovery cite it |
+| `internal/causal` | new: validates a whole history as one rooted, backwards-pointing graph and explains any event |
+| `internal/scenario` | `Result.Causal()`, the runner opens the history before building observers, and the fixture is regenerated |
+| `cmd/aegis` | `explain -ref N [-depth N]` |
+| `Makefile` | `make explain` |
+
+The one thing that did not change is the timeline. Adding a field to every line changes the bytes of the fixture and
+nothing else: the events, their order, their timestamps and their reasons are the ones v0.2.0 produced.
