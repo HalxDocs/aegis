@@ -1,6 +1,7 @@
 package causal
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/HalxDocs/aegis/internal/domain"
@@ -36,5 +37,11 @@ func TestNewIndexesAWellFormedHistory(t *testing.T) {
 	}
 	if _, ok := idx.Event(7); ok {
 		t.Fatal("Event(7) resolved to nothing in a six-event history")
+	}
+}
+
+func TestNewRejectsAnEmptyHistory(t *testing.T) {
+	if _, err := New(nil); !errors.Is(err, ErrEmptyHistory) {
+		t.Fatalf("error = %v, want ErrEmptyHistory", err)
 	}
 }
