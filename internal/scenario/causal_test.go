@@ -46,3 +46,49 @@ func refsOfKind(t *testing.T, res Result, kind domain.Kind) []domain.Ref {
 	}
 	return out
 }
+
+// TestEveryCanonicalRunFormsOneRootedGraph is the structural claim: a run is a
+// single tree, every edge points backwards, and the root is the scenario. Any
+// writer that forgets a cause fails here rather than in an explanation later.
+func TestEveryCanonicalRunFormsOneRootedGraph(t *testing.T) {
+	cases := []struct {
+		name  string
+		spec  Spec
+		seeds []uint64
+	}{
+		{"node-crash", NodeCrash(), []uint64{0, 1, 7}},
+		{"one-way-partition", OneWayPartition(), []uint64{0, 1, 7}},
+		{"lossy", lossy(), []uint64{1, 2, 3, 4, 5}},
+	}
+	for _, tc := range cases {
+		for _, seed := range tc.seeds {
+			res := mustRun(t, tc.spec, seed)
+			idx := causalIndex(t, res)
+			if idx.Root() != 1 {
+				t.Fatalf("%s seed %d: root = %s, want the opening event", tc.name, seed, idx.Root())
+			}
+			if idx.Len() != res.Log.Len() {
+				t.Fatalf("%s seed %d: index covers %d of %d events", tc.name, seed, idx.Len(), res.Log.Len())
+			}
+			for _, ev := range res.Log.Events() {
+				ancestors, err := idx.Ancestors(domain.Ref(ev.Seq))
+				if err != nil {
+					t.Fatalf("%s seed %d: %v", tc.name, seed, err)
+				}
+				// Every event traces back to the scenario, and the scenario
+				// traces back to nothing.
+				hasRoot := false
+				for _, ref := range ancestors {
+					hasRoot = hasRoot || ref == 1
+				}
+				if ev.Seq == 1 && len(ancestors) != 0 {
+					t.Fatalf("%s seed %d: the root has ancestors %v", tc.name, seed, ancestors)
+				}
+				if ev.Seq != 1 && !hasRoot {
+					t.Fatalf("%s seed %d: %s at %d does not trace back to the scenario",
+						tc.name, seed, ev.Kind, ev.At)
+				}
+			}
+		}
+	}
+}
