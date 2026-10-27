@@ -98,3 +98,32 @@ event cites nothing (the scenario) and every other event cites at least one caus
 [internal/scenario/testdata/one-way-partition.jsonl](internal/scenario/testdata/one-way-partition.jsonl) was
 regenerated, which is a change of bytes and not of timeline: every sequence number, timestamp, kind and round is
 the same as it was for v0.2.0, and `TestCanonicalScenarioReproducesTheExpectedTimeline` was not edited.
+
+## 4. The causal contract
+
+Every kind of event has exactly one rule about what caused it. The rule is enforced by tests rather than by
+convention, because a cause is only as good as the writer's honesty about what it knew.
+
+| event | causes | why that is the honest answer |
+| --- | --- | --- |
+| `scenario_started` | none | the root; anything that cited something would make the graph unbounded |
+| `node_started` | the scenario | a node begins because the run did |
+| `heartbeat_sent`, round 1 | the sender's `node_started` | the first round is armed when the node starts |
+| `heartbeat_sent`, round N | the previous send on the same direction | the interval timer is re-armed from the moment of sending |
+| `heartbeat_received` | the send it answers | a receipt is evidence of one message, not of a sender |
+| `message_dropped` (policy) | the send | the configured drop rate discarded this message |
+| `message_dropped` (partition) | the send **and** the `link_partitioned` whose interval the transit met | two independent reasons; each alone is half a story |
+| `suspicion_raised` | the receipt that armed its deadline, or the scenario if nothing ever arrived | the deadline measures silence from evidence; with no evidence, the scenario is what put the observer on watch |
+| `suspicion_cleared` | the receipt that arrived | recovery is caused by evidence, not by elapsed time |
+| `node_crashed` | the scenario | exogenous: the script did it, nothing in the world did |
+| `link_partitioned` | the scenario | exogenous |
+| `link_restored` | the cut it ends | the two ends of one outage belong together |
+| `scenario_finished` | the scenario | the run closes because the scenario that opened it reached its horizon |
+
+Two consequences are worth stating plainly, because both are claims and both are tested:
+
+- **Ground truth is causally inert.** `node_crashed` cites the scenario and is cited by nothing. The same is true of
+  `link_restored`. A crash and a repair are changes in the world; no observer's belief hangs from either.
+- **A cut is not inert.** It is cited by every message it swallowed, which is what makes a lost heartbeat
+  explicable. The cut is visible to the *network*, never to an observer, and the graph keeps that distinction: the
+  drops descend from it, the beliefs do not.
