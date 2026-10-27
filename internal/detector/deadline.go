@@ -91,6 +91,7 @@ func (d *Detector) evaluate(target domain.NodeID, epoch uint64, at domain.Tick) 
 		Node:   target,
 		Peer:   d.observer,
 		Reason: domain.ReasonHeartbeatTimeout,
+		Causes: []domain.Ref{m.evidence},
 	}); err != nil {
 		return fmt.Errorf("detector %s: record suspicion of %s: %w", d.observer, target, err)
 	}

@@ -33,7 +33,7 @@
 {"seq":33,"at":520000000,"kind":"heartbeat_received","node":"A","peer":"B","round":5,"causes":[30]}
 {"seq":34,"at":520000000,"kind":"message_dropped","node":"B","peer":"A","round":5,"reason":"partition","causes":[17,31]}
 {"seq":35,"at":525000000,"kind":"heartbeat_received","node":"B","peer":"C","round":5,"causes":[32]}
-{"seq":36,"at":570000000,"kind":"suspicion_raised","node":"B","peer":"A","reason":"heartbeat_timeout"}
+{"seq":36,"at":570000000,"kind":"suspicion_raised","node":"B","peer":"A","reason":"heartbeat_timeout","causes":[15]}
 {"seq":37,"at":600000000,"kind":"heartbeat_sent","node":"A","peer":"B","round":6,"causes":[30]}
 {"seq":38,"at":600000000,"kind":"heartbeat_sent","node":"B","peer":"A","round":6,"causes":[31]}
 {"seq":39,"at":600000000,"kind":"heartbeat_sent","node":"B","peer":"C","round":6,"causes":[32]}
