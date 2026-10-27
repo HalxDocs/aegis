@@ -242,3 +242,22 @@ func TestEveryExplanationReachesTheRoot(t *testing.T) {
 		}
 	}
 }
+
+func TestTheGraphHoldsForFortySeeds(t *testing.T) {
+	for seed := uint64(1); seed <= 40; seed++ {
+		res := mustRun(t, lossy(), seed)
+		idx := causalIndex(t, res)
+		// The root is the only event allowed to stand alone.
+		for _, ev := range res.Log.Events() {
+			if ev.Seq == 1 {
+				continue
+			}
+			if len(ev.Causes) == 0 {
+				t.Fatalf("seed %d: %s at %d cites nothing", seed, ev.Kind, ev.At)
+			}
+		}
+		if idx.Len() != res.Log.Len() {
+			t.Fatalf("seed %d: index is missing events", seed)
+		}
+	}
+}
