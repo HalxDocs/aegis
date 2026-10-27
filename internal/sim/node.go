@@ -162,7 +162,12 @@ func (n *node) crash(at domain.Tick) error {
 	if n.timer != nil {
 		n.timer.Cancel()
 	}
-	if _, err := n.eng.record(domain.Event{At: at, Kind: domain.KindNodeCrashed, Node: n.id}); err != nil {
+	if _, err := n.eng.record(domain.Event{
+		At:     at,
+		Kind:   domain.KindNodeCrashed,
+		Node:   n.id,
+		Causes: []domain.Ref{n.eng.Root()},
+	}); err != nil {
 		return fmt.Errorf("node %s: record crash: %w", n.id, err)
 	}
 	return nil

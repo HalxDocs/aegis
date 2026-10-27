@@ -36,3 +36,29 @@ func equalRefs(got, want []domain.Ref) bool {
 	}
 	return true
 }
+
+func TestCrashedCitesTheScenarioNotTheLastMessage(t *testing.T) {
+	e, rec := newTestEngine(t, EngineConfig{})
+	if err := e.AddNode(NodeConfig{ID: "A"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := e.AddNode(NodeConfig{ID: "B"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := e.CrashAt(tickAt(50), "B"); err != nil {
+		t.Fatal(err)
+	}
+	if err := e.Start(); err != nil {
+		t.Fatal(err)
+	}
+	if err := e.Run(tickAt(100)); err != nil {
+		t.Fatal(err)
+	}
+	crashed := rec.ofKind(domain.KindNodeCrashed)
+	if len(crashed) != 1 {
+		t.Fatalf("node_crashed = %d, want 1", len(crashed))
+	}
+	if want := []domain.Ref{e.Root()}; !equalRefs(crashed[0].Causes, want) {
+		t.Fatalf("node_crashed causes = %v, want the scenario %v", crashed[0].Causes, want)
+	}
+}
