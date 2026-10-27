@@ -1,6 +1,7 @@
 package scenario
 
 import (
+	"github.com/HalxDocs/aegis/internal/causal"
 	"github.com/HalxDocs/aegis/internal/domain"
 	"github.com/HalxDocs/aegis/internal/observability"
 )
@@ -24,6 +25,12 @@ type Result struct {
 	Beliefs map[ObservationKey]domain.Observation
 	Reports []domain.FailureReport
 }
+
+// Causal validates the history and returns it as a graph of reasons.
+//
+// The index is built from the events alone: if the run produced a log that is
+// not one rooted, backwards-pointing graph, this is where that is discovered.
+func (r Result) Causal() (*causal.Index, error) { return causal.New(r.Log.Events()) }
 
 // Belief returns one observer's final belief about one target.
 func (r Result) Belief(observer, target domain.NodeID) (domain.Observation, bool) {
