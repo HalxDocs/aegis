@@ -95,3 +95,19 @@ func TestNewRejectsACauseOutsideTheHistory(t *testing.T) {
 		t.Fatalf("error = %v, want ErrDanglingCause", err)
 	}
 }
+
+func TestNewRejectsAnEventThatCitesItself(t *testing.T) {
+	events := sample()
+	events[2].Causes = []domain.Ref{3}
+	if _, err := New(events); !errors.Is(err, ErrCauseOrder) {
+		t.Fatalf("error = %v, want ErrCauseOrder", err)
+	}
+}
+
+func TestNewRejectsAnEventThatCitesTheFuture(t *testing.T) {
+	events := sample()
+	events[1].Causes = []domain.Ref{4}
+	if _, err := New(events); !errors.Is(err, ErrCauseOrder) {
+		t.Fatalf("error = %v, want ErrCauseOrder for a reference ahead of the event", err)
+	}
+}
