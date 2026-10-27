@@ -71,3 +71,11 @@ func TestNewRejectsAHistoryThatDoesNotOpenWithTheScenario(t *testing.T) {
 		t.Fatalf("error = %v, want ErrNoRoot", err)
 	}
 }
+
+func TestNewRejectsAnEventWithNoCause(t *testing.T) {
+	events := sample()
+	events[2].Causes = nil
+	if _, err := New(events); !errors.Is(err, ErrUncaused) {
+		t.Fatalf("error = %v, want ErrUncaused", err)
+	}
+}
