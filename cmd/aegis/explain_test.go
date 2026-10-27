@@ -44,3 +44,32 @@ func TestExplainWalksFromASuspicionToTheEvidence(t *testing.T) {
 		t.Fatal("the crash appears in an observer's reasoning; it was never delivered to anyone")
 	}
 }
+
+func TestExplainCanBeLimitedToAFewSteps(t *testing.T) {
+	out, err := runCLI(t, "explain", "-scenario", "node-crash", "-ref", "14", "-depth", "2")
+	if err != nil {
+		t.Fatalf("explain: %v", err)
+	}
+	lines := strings.Split(strings.TrimSpace(out), "\n")
+	if len(lines) != 4 {
+		t.Fatalf("lines = %d, want three steps and a marker:\n%s", len(lines), out)
+	}
+	if lines[2] != "    <- 9  200ms  heartbeat_sent  B->A round 2" {
+		t.Fatalf("last step = %q, want the send", lines[2])
+	}
+	if strings.TrimSpace(lines[3]) != "..." {
+		t.Fatalf("marker = %q, want a truncated branch to say so", lines[3])
+	}
+}
+
+func TestExplainRejectsAReferenceThatNamesNothing(t *testing.T) {
+	if _, err := runCLI(t, "explain", "-scenario", "node-crash", "-ref", "99"); err == nil {
+		t.Fatal("explaining an event that does not exist was accepted")
+	}
+}
+
+func TestExplainRequiresAReference(t *testing.T) {
+	if _, err := runCLI(t, "explain", "-scenario", "node-crash"); err == nil {
+		t.Fatal("explain ran without being told which event to explain")
+	}
+}
