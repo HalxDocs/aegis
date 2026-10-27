@@ -28,6 +28,12 @@ var (
 
 // Recorder is an in-memory append-only history.
 //
+// It is also the identity authority: sequence numbers are allocated here and
+// nowhere else, so a reference handed back by Record is the only name an event
+// ever has. Anything that wanted its own numbering would have to be kept in
+// step with this one, and a graph built on two counters is a graph that can
+// disagree with itself.
+//
 // It is not safe for concurrent use: a run is single-goroutine, and isolation
 // between runs comes from giving each run its own Recorder.
 type Recorder struct {
