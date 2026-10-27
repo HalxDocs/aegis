@@ -174,20 +174,23 @@ func (n *network) addCut(link domain.Link, from, until domain.Tick) {
 // failure cannot leave a "sent" event in the history for a message that was
 // never accepted. The delivery cannot overtake the record: scheduling only
 // queues work, and queued work runs after the current task returns.
-func (n *network) send(at domain.Tick, msg Message) error {
+func (n *network) send(at domain.Tick, msg Message, cause domain.Ref) (domain.Ref, error) {
 	link, err := domain.NewLink(msg.From, msg.To)
 	if err != nil {
-		return err
+		return 0, err
 	}
 	w, ok := n.links[link]
 	if !ok {
-		return fmt.Errorf("%w: %s", ErrUnknownLink, link)
+		return 0, fmt.Errorf("%w: %s", ErrUnknownLink, link)
 	}
 	if msg.Round == 0 {
-		return fmt.Errorf("message %s: round must be positive", link)
+		return 0, fmt.Errorf("message %s: round must be positive", link)
 	}
 
 	dropped := n.rng.hit(w.dropPPM)
+	// sent is filled in by the record call below. The closure cannot run before
+	// this task returns, so the arrival always sees the reference.
+	var sent domain.Ref
 	if !dropped {
 		arrives := at + w.latency
 		// A cut path loses the message in flight: it is accepted by the sender
@@ -195,27 +198,30 @@ func (n *network) send(at domain.Tick, msg Message) error {
 		// rather than the send, because that is when the message fails to
 		// arrive and when an observer's silence starts to mean something.
 		lost := w.cutDuring(at, arrives)
-		if _, err := n.sched.At(arrives, func() { n.arrive(arrives, msg, lost) }); err != nil {
-			return fmt.Errorf("schedule delivery of %s: %w", link, err)
+		if _, err := n.sched.At(arrives, func() { n.arrive(arrives, msg, sent, lost) }); err != nil {
+			return 0, fmt.Errorf("schedule delivery of %s: %w", link, err)
 		}
 	}
-	if _, err := n.rec.Record(domain.Event{
-		At:    at,
-		Kind:  domain.KindHeartbeatSent,
-		Node:  msg.From,
-		Peer:  msg.To,
-		Round: msg.Round,
-	}); err != nil {
-		return err
+	ref, err := n.rec.Record(domain.Event{
+		At:     at,
+		Kind:   domain.KindHeartbeatSent,
+		Node:   msg.From,
+		Peer:   msg.To,
+		Round:  msg.Round,
+		Causes: []domain.Ref{cause},
+	})
+	if err != nil {
+		return 0, err
 	}
+	sent = ref
 	if !dropped {
-		return nil
+		return ref, nil
 	}
-	return n.recordDrop(at, msg, domain.ReasonDropPolicy)
+	return ref, n.recordDrop(at, msg, domain.ReasonDropPolicy)
 }
 
 // arrive is what becomes of a message that was accepted by the sender.
-func (n *network) arrive(at domain.Tick, msg Message, lost bool) {
+func (n *network) arrive(at domain.Tick, msg Message, sent domain.Ref, lost bool) {
 	if !lost {
 		n.deliver(at, msg)
 		return

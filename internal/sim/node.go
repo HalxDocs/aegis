@@ -60,19 +60,24 @@ type node struct {
 	// started is the reference of this node's own start event, which is the
 	// cause of its first heartbeat.
 	started domain.Ref
-	timer   domain.Timer
-	eng     *Engine
+
+	// lastSent remembers the reference of the last message sent to each peer,
+	// which is the cause of the next round on that direction.
+	lastSent map[domain.NodeID]domain.Ref
+	timer    domain.Timer
+	eng      *Engine
 }
 
 func newNode(cfg NodeConfig, eng *Engine) *node {
 	peers := slices.Clone(cfg.Peers)
 	slices.Sort(peers)
 	return &node{
-		id:    cfg.ID,
-		state: domain.StateRunning,
-		every: cfg.HeartbeatEvery,
-		peers: peers,
-		eng:   eng,
+		id:       cfg.ID,
+		state:    domain.StateRunning,
+		every:    cfg.HeartbeatEvery,
+		peers:    peers,
+		lastSent: make(map[domain.NodeID]domain.Ref, len(peers)),
+		eng:      eng,
 	}
 }
 
@@ -119,11 +124,26 @@ func (n *node) beat(at domain.Tick) error {
 	n.round++
 	for _, peer := range n.peers {
 		msg := Message{From: n.id, To: peer, Round: n.round}
-		if err := n.eng.net.send(at, msg); err != nil {
+		sent, err := n.eng.net.send(at, msg, n.causeFor(peer))
+		if err != nil {
 			return fmt.Errorf("node %s: heartbeat round %d: %w", n.id, n.round, err)
 		}
+		n.lastSent[peer] = sent
 	}
 	return n.scheduleHeartbeat(at)
+}
+
+// causeFor returns the event that caused the next heartbeat to peer: the
+// previous send on the same direction, or this node's start for the first round.
+//
+// It is per peer rather than per node because each direction has its own
+// schedule; one chain for the whole node would claim a link's round two was
+// caused by another link's round one.
+func (n *node) causeFor(peer domain.NodeID) domain.Ref {
+	if ref, ok := n.lastSent[peer]; ok {
+		return ref
+	}
+	return n.started
 }
 
 // crash moves the node to its terminal state and stops its own timers.

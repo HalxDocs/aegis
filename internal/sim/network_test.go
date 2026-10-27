@@ -41,7 +41,7 @@ func TestNetworkDeliversAfterConfiguredLatency(t *testing.T) {
 	if err := net.addLink(LinkConfig{From: "B", To: "A", Latency: tickAt(250)}); err != nil {
 		t.Fatalf("addLink: %v", err)
 	}
-	if err := net.send(tickAt(100), Message{From: "B", To: "A", Round: 1}); err != nil {
+	if _, err := net.send(tickAt(100), Message{From: "B", To: "A", Round: 1}, 1); err != nil {
 		t.Fatalf("send: %v", err)
 	}
 	if len(*got) != 0 {
@@ -67,7 +67,7 @@ func TestNetworkZeroLatencyDeliversAtSendTime(t *testing.T) {
 	if err := net.addLink(LinkConfig{From: "B", To: "A"}); err != nil {
 		t.Fatal(err)
 	}
-	if err := net.send(tickAt(100), Message{From: "B", To: "A", Round: 3}); err != nil {
+	if _, err := net.send(tickAt(100), Message{From: "B", To: "A", Round: 3}, 1); err != nil {
 		t.Fatal(err)
 	}
 	runScheduler(t, sched)
@@ -81,7 +81,7 @@ func TestNetworkDropIsDecidedAtSendTime(t *testing.T) {
 	if err := net.addLink(LinkConfig{From: "B", To: "A", Latency: tickAt(20), DropPPM: ppmScale}); err != nil {
 		t.Fatal(err)
 	}
-	if err := net.send(tickAt(100), Message{From: "B", To: "A", Round: 2}); err != nil {
+	if _, err := net.send(tickAt(100), Message{From: "B", To: "A", Round: 2}, 1); err != nil {
 		t.Fatal(err)
 	}
 
@@ -113,7 +113,7 @@ func TestNetworkSendRejectsUnknownLink(t *testing.T) {
 	if err := net.addLink(LinkConfig{From: "B", To: "A"}); err != nil {
 		t.Fatal(err)
 	}
-	err := net.send(tickAt(1), Message{From: "C", To: "A", Round: 1})
+	_, err := net.send(tickAt(1), Message{From: "C", To: "A", Round: 1}, 1)
 	if !errors.Is(err, ErrUnknownLink) {
 		t.Fatalf("error = %v, want ErrUnknownLink", err)
 	}
@@ -124,10 +124,10 @@ func TestNetworkSendRejectsInvalidMessage(t *testing.T) {
 	if err := net.addLink(LinkConfig{From: "B", To: "A"}); err != nil {
 		t.Fatal(err)
 	}
-	if err := net.send(tickAt(1), Message{From: "B", To: "A"}); err == nil {
+	if _, err := net.send(tickAt(1), Message{From: "B", To: "A"}, 1); err == nil {
 		t.Fatal("round zero must be rejected")
 	}
-	if err := net.send(tickAt(1), Message{From: "B", To: "B", Round: 1}); !errors.Is(err, domain.ErrInvalidLink) {
+	if _, err := net.send(tickAt(1), Message{From: "B", To: "B", Round: 1}, 1); !errors.Is(err, domain.ErrInvalidLink) {
 		t.Fatalf("self message error = %v, want ErrInvalidLink", err)
 	}
 }
