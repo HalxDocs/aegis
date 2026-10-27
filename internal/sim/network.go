@@ -118,7 +118,7 @@ type network struct {
 	rng     *rng
 	sched   domain.Scheduler
 	rec     EventRecorder
-	deliver func(at domain.Tick, msg Message)
+	deliver func(at domain.Tick, msg Message, cause domain.Ref)
 
 	// fault reports a write that failed inside a scheduled task. A task has no
 	// caller to return an error to, so the engine hands its own Fail here.
@@ -131,7 +131,7 @@ func newNetwork(sched domain.Scheduler, rec EventRecorder, rng *rng) *network {
 		sched:   sched,
 		rec:     rec,
 		rng:     rng,
-		deliver: func(domain.Tick, Message) {},
+		deliver: func(domain.Tick, Message, domain.Ref) {},
 	}
 }
 
@@ -235,7 +235,7 @@ func (n *network) send(at domain.Tick, msg Message, cause domain.Ref) (domain.Re
 // arrive is what becomes of a message that was accepted by the sender.
 func (n *network) arrive(at domain.Tick, msg Message, sent domain.Ref, lost bool) {
 	if !lost {
-		n.deliver(at, msg)
+		n.deliver(at, msg, sent)
 		return
 	}
 	if err := n.recordDrop(at, msg, domain.ReasonPartition); err != nil {

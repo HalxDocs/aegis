@@ -50,6 +50,7 @@ type receivedHeartbeat struct {
 	From  domain.NodeID
 	To    domain.NodeID
 	Round uint64
+	Cause domain.Ref
 }
 
 type stubReceiver struct {
@@ -57,11 +58,11 @@ type stubReceiver struct {
 	err error
 }
 
-func (r *stubReceiver) HeartbeatReceived(at domain.Tick, from, to domain.NodeID, round uint64) error {
+func (r *stubReceiver) HeartbeatReceived(at domain.Tick, from, to domain.NodeID, round uint64, cause domain.Ref) error {
 	if r.err != nil {
 		return r.err
 	}
-	r.got = append(r.got, receivedHeartbeat{At: at, From: from, To: to, Round: round})
+	r.got = append(r.got, receivedHeartbeat{At: at, From: from, To: to, Round: round, Cause: cause})
 	return nil
 }
 

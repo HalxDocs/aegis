@@ -43,8 +43,11 @@ type EventRecorder interface {
 //
 // Every receiver sees every delivery and decides for itself whether the message
 // concerns it, because the simulator knows nothing about who is watching whom.
+//
+// cause is the reference of the send this delivery answers, so a receipt can
+// cite the message rather than describing it.
 type Receiver interface {
-	HeartbeatReceived(at domain.Tick, from, to domain.NodeID, round uint64) error
+	HeartbeatReceived(at domain.Tick, from, to domain.NodeID, round uint64, cause domain.Ref) error
 }
 
 // EngineConfig configures a simulator run.
@@ -250,13 +253,13 @@ func (e *Engine) fail(err error) {
 	}
 }
 
-func (e *Engine) deliver(at domain.Tick, msg Message) {
+func (e *Engine) deliver(at domain.Tick, msg Message, cause domain.Ref) {
 	if len(e.receivers) == 0 {
 		e.fail(ErrNoReceiver)
 		return
 	}
 	for _, r := range e.receivers {
-		if err := r.HeartbeatReceived(at, msg.From, msg.To, msg.Round); err != nil {
+		if err := r.HeartbeatReceived(at, msg.From, msg.To, msg.Round, cause); err != nil {
 			e.fail(fmt.Errorf("deliver heartbeat %s->%s round %d: %w", msg.From, msg.To, msg.Round, err))
 			return
 		}

@@ -149,16 +149,17 @@ func (d *Detector) Watch(target domain.NodeID) error {
 // must not borrow evidence that was never delivered to it. A message from a
 // sender that is not watched is still recorded as a receipt, because the
 // history is a record of what arrived, not only of what mattered.
-func (d *Detector) HeartbeatReceived(at domain.Tick, from, to domain.NodeID, round uint64) error {
+func (d *Detector) HeartbeatReceived(at domain.Tick, from, to domain.NodeID, round uint64, cause domain.Ref) error {
 	if to != d.observer {
 		return nil
 	}
 	if _, err := d.rec.Record(domain.Event{
-		At:    at,
-		Kind:  domain.KindHeartbeatReceived,
-		Node:  from,
-		Peer:  to,
-		Round: round,
+		At:     at,
+		Kind:   domain.KindHeartbeatReceived,
+		Node:   from,
+		Peer:   to,
+		Round:  round,
+		Causes: []domain.Ref{cause},
 	}); err != nil {
 		return fmt.Errorf("detector %s: record receipt from %s: %w", d.observer, from, err)
 	}

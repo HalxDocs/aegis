@@ -8,8 +8,9 @@ import (
 )
 
 type delivery struct {
-	at  domain.Tick
-	msg Message
+	at    domain.Tick
+	msg   Message
+	cause domain.Ref
 }
 
 func newTestNetwork(t *testing.T, seed uint64) (*network, *scheduler, *stubRecorder, *[]delivery) {
@@ -18,8 +19,8 @@ func newTestNetwork(t *testing.T, seed uint64) (*network, *scheduler, *stubRecor
 	rec := &stubRecorder{}
 	net := newNetwork(sched, rec, newRNG(seed))
 	got := &[]delivery{}
-	net.deliver = func(at domain.Tick, msg Message) {
-		*got = append(*got, delivery{at: at, msg: msg})
+	net.deliver = func(at domain.Tick, msg Message, cause domain.Ref) {
+		*got = append(*got, delivery{at: at, msg: msg, cause: cause})
 	}
 	// The engine supplies this in a real run; without it a failed write inside a
 	// scheduled task would be lost, which is exactly what the hook exists for.

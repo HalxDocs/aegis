@@ -94,7 +94,7 @@ func TestMessagesAddressedToAnotherObserverAreIgnored(t *testing.T) {
 	h := newHarness(t, "A", tickAt(350))
 	h.mustWatch(t, "B")
 
-	if err := h.det.HeartbeatReceived(tickAt(120), "B", "C", 1); err != nil {
+	if err := h.det.HeartbeatReceived(tickAt(120), "B", "C", 1, 1); err != nil {
 		t.Fatalf("unaddressed message returned %v", err)
 	}
 	if len(h.rec.events) != 0 {
@@ -112,7 +112,7 @@ func TestReceiptFromUnwatchedSenderIsStillRecorded(t *testing.T) {
 	h := newHarness(t, "A", tickAt(350))
 	h.mustWatch(t, "B")
 
-	if err := h.det.HeartbeatReceived(tickAt(120), "C", "A", 7); err != nil {
+	if err := h.det.HeartbeatReceived(tickAt(120), "C", "A", 7, 1); err != nil {
 		t.Fatalf("receipt: %v", err)
 	}
 	received := h.rec.ofKind(domain.KindHeartbeatReceived)
@@ -132,7 +132,7 @@ func TestReceiptRefreshesBeliefAndDeadline(t *testing.T) {
 	h := newHarness(t, "A", tickAt(350))
 	h.mustWatch(t, "B")
 
-	if err := h.det.HeartbeatReceived(tickAt(120), "B", "A", 1); err != nil {
+	if err := h.det.HeartbeatReceived(tickAt(120), "B", "A", 1, 1); err != nil {
 		t.Fatalf("receipt: %v", err)
 	}
 	obs := h.believe(t, "B")
@@ -222,7 +222,7 @@ func TestFreshEvidenceClearsSuspicion(t *testing.T) {
 	h.mustWatch(t, "B")
 	h.sched.run(tickAt(350), true)
 
-	if err := h.det.HeartbeatReceived(tickAt(500), "B", "A", 3); err != nil {
+	if err := h.det.HeartbeatReceived(tickAt(500), "B", "A", 3, 1); err != nil {
 		t.Fatalf("receipt: %v", err)
 	}
 	obs := h.believe(t, "B")
@@ -255,10 +255,10 @@ func TestFreshEvidenceClearsSuspicion(t *testing.T) {
 func TestLateMessageIsRejected(t *testing.T) {
 	h := newHarness(t, "A", tickAt(350))
 	h.mustWatch(t, "B")
-	if err := h.det.HeartbeatReceived(tickAt(500), "B", "A", 2); err != nil {
+	if err := h.det.HeartbeatReceived(tickAt(500), "B", "A", 2, 1); err != nil {
 		t.Fatalf("receipt: %v", err)
 	}
-	if err := h.det.HeartbeatReceived(tickAt(400), "B", "A", 1); !errors.Is(err, domain.ErrInvalidObservation) {
+	if err := h.det.HeartbeatReceived(tickAt(400), "B", "A", 1, 1); !errors.Is(err, domain.ErrInvalidObservation) {
 		t.Fatalf("out-of-order receipt error = %v, want ErrInvalidObservation", err)
 	}
 	if obs := h.believe(t, "B"); obs.LastSeen != tickAt(500) || obs.Heard != 1 {

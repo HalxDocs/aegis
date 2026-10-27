@@ -11,7 +11,7 @@ func TestCancelledDeadlineNeverFires(t *testing.T) {
 	h := newHarness(t, "A", tickAt(350))
 	h.mustWatch(t, "B")
 
-	if err := h.det.HeartbeatReceived(tickAt(120), "B", "A", 1); err != nil {
+	if err := h.det.HeartbeatReceived(tickAt(120), "B", "A", 1, 1); err != nil {
 		t.Fatalf("receipt: %v", err)
 	}
 	h.sched.run(tickAt(400), true)
@@ -27,7 +27,7 @@ func TestCancelledDeadlineNeverFires(t *testing.T) {
 func TestPhantomDeadlineIsIgnoredByTheEpochGuard(t *testing.T) {
 	h := newHarness(t, "A", tickAt(350))
 	h.mustWatch(t, "B")
-	if err := h.det.HeartbeatReceived(tickAt(120), "B", "A", 1); err != nil {
+	if err := h.det.HeartbeatReceived(tickAt(120), "B", "A", 1, 1); err != nil {
 		t.Fatalf("receipt: %v", err)
 	}
 
@@ -60,7 +60,7 @@ func TestMessageAtTheDeadlineInstantsWinsTheTie(t *testing.T) {
 	// The delivery is ordinary work and the deadline is end-of-instant work, so
 	// the message is observed first even though it was scheduled later.
 	if _, err := h.sched.At(tickAt(350), func() {
-		if err := h.det.HeartbeatReceived(tickAt(350), "B", "A", 4); err != nil {
+		if err := h.det.HeartbeatReceived(tickAt(350), "B", "A", 4, 1); err != nil {
 			t.Errorf("receipt: %v", err)
 		}
 	}); err != nil {
