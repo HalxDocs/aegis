@@ -174,3 +174,50 @@ func TestDescendantsAreTheEventsOneRefExplains(t *testing.T) {
 		t.Fatalf("error = %v, want ErrUnknownRef for the zero reference", err)
 	}
 }
+
+func TestExplainReturnsTheChainOfReasons(t *testing.T) {
+	idx, err := New(sample())
+	if err != nil {
+		t.Fatal(err)
+	}
+	exp, err := idx.Explain(5)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if exp.Event.Kind != domain.KindSuspicionRaised {
+		t.Fatalf("explanation is about %s, want the suspicion", exp.Event.Kind)
+	}
+	if exp.Depth() != 4 {
+		t.Fatalf("depth = %d, want 4 edges back to the root", exp.Depth())
+	}
+	if exp.Count() != 5 {
+		t.Fatalf("count = %d, want the five events on the chain", exp.Count())
+	}
+	// Every step of the way down has exactly one cause, in order.
+	want := []domain.Kind{
+		domain.KindSuspicionRaised, domain.KindHeartbeatReceived,
+		domain.KindHeartbeatSent, domain.KindNodeStarted, domain.KindScenarioStarted,
+	}
+	for i, kind := range want {
+		if exp.Event.Kind != kind {
+			t.Fatalf("step %d is %s, want %s", i, exp.Event.Kind, kind)
+		}
+		if i == len(want)-1 {
+			break
+		}
+		if len(exp.Causes) != 1 {
+			t.Fatalf("step %d (%s) has %d causes, want 1", i, exp.Event.Kind, len(exp.Causes))
+		}
+		exp = exp.Causes[0]
+	}
+}
+
+func TestExplainRejectsAReferenceThatNamesNothing(t *testing.T) {
+	idx, err := New(sample())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := idx.Explain(9); !errors.Is(err, ErrUnknownRef) {
+		t.Fatalf("error = %v, want ErrUnknownRef", err)
+	}
+}

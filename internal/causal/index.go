@@ -182,3 +182,53 @@ func (i *Index) Descendants(ref domain.Ref) ([]domain.Ref, error) {
 	slices.Sort(out)
 	return out, nil
 }
+
+// Explanation is one event together with the explanations of its causes.
+//
+// It is a value rather than a view: once built it cannot change, so a renderer
+// and a test can hold the same explanation and see the same thing.
+type Explanation struct {
+	Event  domain.Event
+	Causes []*Explanation
+}
+
+// Explain walks backwards from ref and returns the whole chain of reasons.
+//
+// The recursion terminates without a guard because every cause is recorded
+// before its effect and the root cites nothing, a property New enforces.
+func (i *Index) Explain(ref domain.Ref) (*Explanation, error) {
+	ev, ok := i.events[ref]
+	if !ok {
+		return nil, fmt.Errorf("%w: %s", ErrUnknownRef, ref)
+	}
+	node := &Explanation{Event: ev}
+	for _, cause := range ev.Causes {
+		child, err := i.Explain(cause)
+		if err != nil {
+			return nil, err
+		}
+		node.Causes = append(node.Causes, child)
+	}
+	return node, nil
+}
+
+// Depth returns the number of edges on the longest path back to a root. An event
+// that explains itself alone has depth zero.
+func (e *Explanation) Depth() int {
+	depth := 0
+	for _, cause := range e.Causes {
+		if d := cause.Depth() + 1; d > depth {
+			depth = d
+		}
+	}
+	return depth
+}
+
+// Count returns how many events the explanation is made of, including its own.
+func (e *Explanation) Count() int {
+	count := 1
+	for _, cause := range e.Causes {
+		count += cause.Count()
+	}
+	return count
+}
