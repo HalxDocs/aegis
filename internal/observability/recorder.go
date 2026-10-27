@@ -16,6 +16,10 @@ var (
 	// description of arrival order rather than of virtual time.
 	ErrOutOfOrder = errors.New("event precedes the previous event")
 
+	// ErrFutureCause is returned when an event cites a reference the history
+	// has not issued yet. Causes point backwards or they are not causes.
+	ErrFutureCause = errors.New("cause has not been recorded")
+
 	// ErrPreassignedSeq is returned when a caller supplies its own sequence
 	// number. Sequence is the recorder's to assign; a second numbering scheme
 	// is how two histories quietly diverge.
@@ -53,6 +57,12 @@ func (r *Recorder) Record(ev domain.Event) (domain.Ref, error) {
 	}
 
 	ref := domain.Ref(len(r.events) + 1)
+	for _, cause := range ev.Causes {
+		if cause >= ref {
+			return 0, fmt.Errorf("%w: %s at %d cites %s", ErrFutureCause, ev.Kind, ev.At, cause)
+		}
+	}
+
 	ev.Seq = uint64(ref)
 	r.events = append(r.events, ev)
 	return ref, nil
