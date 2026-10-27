@@ -100,8 +100,11 @@ internal/sim            virtual clock, deterministic scheduler, network, nodes, 
 internal/detector       observer-side suspicion from heartbeat timeouts
 internal/observability  append-only event history and JSONL encoding
 internal/scenario       scenario specifications, golden fixtures, the runner
-docs/                   the milestone plans
+docs/                   the milestone plan and the five-minute talk
 ```
+
+A spoken walkthrough of both runs, built to be delivered in five minutes, is in
+[docs/talk-five-minutes.md](docs/talk-five-minutes.md).
 
 The dependency rule is one-way: `cmd` and `scenario` may know every component; the simulator knows the domain; the
 detector knows only the domain, so it has no way to read ground truth.
