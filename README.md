@@ -53,6 +53,33 @@ $ go run ./cmd/aegis run --scenario one-way-partition --format table
 Nothing in this run is down. A one-way cut is the first failure that produces disagreement without a failure:
 B is alive and knows it, C can see it, and A is right about everything it can observe.
 
+## Why it happened
+
+```
+$ go run ./cmd/aegis explain -scenario node-crash -ref 14
+14  570ms  suspicion_raised  B distrusted by A (heartbeat_timeout)
+<- 12  220ms  heartbeat_received  B->A round 2
+    <- 9  200ms  heartbeat_sent  B->A round 2
+        <- 5  100ms  heartbeat_sent  B->A round 1
+            <- 3  0s  node_started  B started
+                <- 1  0s  scenario_started  node-crash
+```
+
+Every event carries the references of the events that caused it, so the log is a graph as well as a sequence. The
+chain above is the whole argument of the project in six lines: A distrusted B because its last evidence arrived at
+220 ms, and the evidence was a message B sent at 200 ms. The crash at 215 ms is in the log and in nobody's
+reasoning, because the crash was never delivered to anybody.
+
+```
+$ go run ./cmd/aegis explain -scenario one-way-partition -ref 61
+61  920ms  suspicion_cleared  B trusted again by A
+<- 60  920ms  heartbeat_received  B->A round 9
+    <- 57  900ms  heartbeat_sent  B->A round 9
+```
+
+The recovery cites the arrival at 920 ms, never the repair at 900 ms: a path coming back explains nothing until a
+message crosses it. See [doc_m3.md](doc_m3.md) for the contract and its limits.
+
 ## Status
 
 Milestones 1 and 2 are complete. See [doc_m1.md](doc_m1.md) and [doc_m2.md](doc_m2.md) for every engineering
