@@ -111,3 +111,13 @@ func TestNewRejectsAnEventThatCitesTheFuture(t *testing.T) {
 		t.Fatalf("error = %v, want ErrCauseOrder for a reference ahead of the event", err)
 	}
 }
+
+func TestNewRejectsACauseDatestampedAfterItsEffect(t *testing.T) {
+	events := sample()
+	// The reference is legitimately earlier, but the timestamp is not.
+	events[1].Causes = []domain.Ref{1}
+	events[0].At = 50
+	if _, err := New(events); !errors.Is(err, ErrFutureCause) {
+		t.Fatalf("error = %v, want ErrFutureCause", err)
+	}
+}
