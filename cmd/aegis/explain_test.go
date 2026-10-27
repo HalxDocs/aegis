@@ -87,3 +87,38 @@ func TestExplainingTheRootShowsOneLine(t *testing.T) {
 		t.Fatalf("line = %q, want the scenario", lines[0])
 	}
 }
+
+func TestExplainingADropShowsBothReasons(t *testing.T) {
+	out, err := runCLI(t, "explain", "-scenario", "one-way-partition", "-ref", "22")
+	if err != nil {
+		t.Fatalf("explain: %v", err)
+	}
+	lines := strings.Split(strings.TrimSpace(out), "\n")
+	if !strings.Contains(lines[0], "message_dropped") {
+		t.Fatalf("first line = %q, want the drop", lines[0])
+	}
+	// Both causes are one level down: the cut and the send.
+	if len(lines) < 3 {
+		t.Fatalf("the explanation has %d lines, want both branches:\n%s", len(lines), out)
+	}
+	if !strings.Contains(lines[1], "link_partitioned") || !strings.Contains(lines[2], "heartbeat_sent") {
+		t.Fatalf("branches = %q, %q; want the cut then the send", lines[1], lines[2])
+	}
+}
+
+func TestExplainingTheRecoveryShowsTheArrivalThatCausedIt(t *testing.T) {
+	out, err := runCLI(t, "explain", "-scenario", "one-way-partition", "-ref", "61")
+	if err != nil {
+		t.Fatalf("explain: %v", err)
+	}
+	lines := strings.Split(strings.TrimSpace(out), "\n")
+	if !strings.Contains(lines[0], "suspicion_cleared") {
+		t.Fatalf("first line = %q, want the recovery", lines[0])
+	}
+	if !strings.Contains(lines[1], "920ms") || !strings.Contains(lines[2], "900ms") {
+		t.Fatalf("recovery chain = %q then %q, want 920 ms over 900 ms", lines[1], lines[2])
+	}
+	if strings.Contains(out, "link_restored") {
+		t.Fatal("the repair appears in the recovery's reasoning; the belief changed because a message arrived")
+	}
+}
