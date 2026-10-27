@@ -221,3 +221,35 @@ func TestExplainRejectsAReferenceThatNamesNothing(t *testing.T) {
 		t.Fatalf("error = %v, want ErrUnknownRef", err)
 	}
 }
+
+func TestAnExplanationCanHaveMoreThanOneParent(t *testing.T) {
+	idx, err := New([]domain.Event{
+		{Seq: 1, At: 0, Kind: domain.KindScenarioStarted, Scenario: "cut"},
+		{Seq: 2, At: 0, Kind: domain.KindNodeStarted, Node: "A", Causes: []domain.Ref{1}},
+		{Seq: 3, At: 300, Kind: domain.KindHeartbeatSent, Node: "A", Peer: "B", Round: 3, Causes: []domain.Ref{2}},
+		{Seq: 4, At: 300, Kind: domain.KindLinkPartitioned, Node: "B", Peer: "A", Causes: []domain.Ref{1}},
+		{Seq: 5, At: 320, Kind: domain.KindMessageDropped, Node: "A", Peer: "B", Round: 3, Reason: domain.ReasonPartition, Causes: []domain.Ref{3, 4}},
+		{Seq: 6, At: 600, Kind: domain.KindScenarioFinished, Scenario: "cut", Causes: []domain.Ref{1}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	exp, err := idx.Explain(5)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(exp.Causes) != 2 {
+		t.Fatalf("the drop has %d causes, want the send and the cut", len(exp.Causes))
+	}
+	if exp.Causes[0].Event.Seq != 3 || exp.Causes[1].Event.Seq != 4 {
+		t.Fatalf("causes are %d and %d, want 3 then 4",
+			exp.Causes[0].Event.Seq, exp.Causes[1].Event.Seq)
+	}
+	// 5 -> {3 -> 2 -> 1, 4 -> 1}: six nodes, the root reached along two paths.
+	if exp.Count() != 6 {
+		t.Fatalf("count = %d, want 6 nodes counting the shared root once per path", exp.Count())
+	}
+	if exp.Depth() != 3 {
+		t.Fatalf("depth = %d, want 3", exp.Depth())
+	}
+}
