@@ -57,3 +57,17 @@ func TestScenarioStartCannotCiteACause(t *testing.T) {
 		t.Fatalf("the opening event was rejected: %v", err)
 	}
 }
+
+func TestCausesSurviveValidationOnEveryKind(t *testing.T) {
+	for _, ev := range []Event{
+		{At: 1, Kind: KindNodeStarted, Node: "A", Causes: []Ref{1}},
+		{At: 1, Kind: KindNodeCrashed, Node: "A", Causes: []Ref{1}},
+		{At: 1, Kind: KindHeartbeatSent, Node: "A", Peer: "B", Round: 1, Causes: []Ref{2}},
+		{At: 1, Kind: KindMessageDropped, Node: "A", Peer: "B", Round: 1, Reason: ReasonPartition, Causes: []Ref{2, 3}},
+		{At: 1, Kind: KindSuspicionCleared, Node: "A", Peer: "B", Causes: []Ref{4}},
+	} {
+		if err := ev.Validate(); err != nil {
+			t.Fatalf("%s with causes was rejected: %v", ev.Kind, err)
+		}
+	}
+}
