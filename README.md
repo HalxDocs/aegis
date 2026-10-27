@@ -61,6 +61,16 @@ decision, the risks considered, the drift between plan and code, and the verific
 Deliberately absent so far: jitter, correlated loss, causal history, recovery, diagnosis, scenario files, and any
 real concurrency inside the simulation. A recovery loop that guesses would be worse than no recovery loop.
 
+## Releases
+
+Each milestone is cut as a tag. The release notes are written for people reading the code: what the run shows, what
+moved in the API, the one decision worth arguing about, and what is still not modelled.
+
+| release | what it covers |
+| --- | --- |
+| [v0.2.0](https://github.com/HalxDocs/aegis/releases/tag/v0.2.0) — Milestone 2: one-way partitions | A cut as a schedule on the wire rather than a flag: `Engine.PartitionAt`, the `link_partitioned` and `link_restored` events, and the `one-way-partition` scenario with its 75-event golden fixture. Nothing crashes, and a node is still distrusted for 350 ms. |
+| Milestone 1 — node crash (untagged) | The foundation: virtual clock, deterministic scheduler, heartbeats over links with different latencies, observer-side timeouts, and the canonical 16-event `node-crash` run. See [doc_m1.md](doc_m1.md). |
+
 ## Requirements
 
 - Go 1.25 or newer
