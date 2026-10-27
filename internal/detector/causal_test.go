@@ -126,3 +126,32 @@ func TestAReceiptCitesTheSendItAnswers(t *testing.T) {
 		t.Fatalf("receipt cites %v, want the send that was handed to it", receipt.Causes)
 	}
 }
+
+func TestASuspicionCitesTheNewestEvidenceNotTheFirst(t *testing.T) {
+	h := rootedHarness(t, "A", tickAt(350))
+	h.mustWatch(t, "B")
+	h.sched.run(tickAt(120), true)
+	if err := h.det.HeartbeatReceived(tickAt(120), "B", "A", 1, 9); err != nil {
+		t.Fatal(err)
+	}
+	h.sched.run(tickAt(200), true)
+	if err := h.det.HeartbeatReceived(tickAt(200), "B", "A", 2, 10); err != nil {
+		t.Fatal(err)
+	}
+	h.sched.run(tickAt(600), true)
+
+	raised := h.rec.ofKind(domain.KindSuspicionRaised)
+	if len(raised) != 1 {
+		t.Fatalf("suspicion events = %d, want 1", len(raised))
+	}
+	receipts := h.rec.ofKind(domain.KindHeartbeatReceived)
+	newest := h.rec.refOf(receipts[len(receipts)-1])
+	older := h.rec.refOf(receipts[0])
+	if want := []domain.Ref{newest}; len(raised[0].Causes) != 1 || raised[0].Causes[0] != want[0] {
+		t.Fatalf("suspicion cites %v, want the newest receipt %d rather than %d", raised[0].Causes, newest, older)
+	}
+	// The silence it reports is measured from the newest evidence.
+	if released := h.det.Reports(); len(released) != 1 || released[0].LastSeenAt != tickAt(200) {
+		t.Fatalf("report = %+v, want silence measured from 200 ms", released)
+	}
+}
