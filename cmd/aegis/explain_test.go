@@ -130,3 +130,20 @@ func TestExplainingTheRecoveryShowsTheArrivalThatCausedIt(t *testing.T) {
 		t.Fatal("the repair appears in the recovery's reasoning; the belief changed because a message arrived")
 	}
 }
+
+func TestExplainingTheSuspicionInThePartitionRunStopsAtTheEvidence(t *testing.T) {
+	out, err := runCLI(t, "explain", "-scenario", "one-way-partition", "-ref", "36")
+	if err != nil {
+		t.Fatalf("explain: %v", err)
+	}
+	lines := strings.Split(strings.TrimSpace(out), "\n")
+	if !strings.Contains(lines[0], "suspicion_raised") {
+		t.Fatalf("first line = %q, want the suspicion", lines[0])
+	}
+	if !strings.Contains(out, "220ms") {
+		t.Fatalf("the chain does not mention the evidence at 220 ms:\n%s", out)
+	}
+	if strings.Contains(out, "link_partitioned") {
+		t.Fatalf("the cut appears in the belief's reasoning:\n%s", out)
+	}
+}
