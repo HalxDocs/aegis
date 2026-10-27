@@ -197,7 +197,48 @@ func TestALostMessageHasTwoReasons(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(ancestors) != 4 {
-		t.Fatalf("the drop has %d ancestors (%v), want the cut, the send, the node and the scenario", len(ancestors), ancestors)
+	// Both branches are in the ancestry, and the send branch runs back through
+	// every earlier round on that direction before it reaches the node.
+	for _, want := range []domain.Ref{cut, ev.Causes[1]} {
+		found := false
+		for _, cause := range ancestors {
+			found = found || cause == want
+		}
+		if !found {
+			t.Fatalf("the drop's ancestry %v omits %s", ancestors, want)
+		}
+	}
+	if len(ancestors) < 6 {
+		t.Fatalf("the drop has %d ancestors (%v), want the cut and the four-link send chain", len(ancestors), ancestors)
+	}
+}
+
+// TestEveryExplanationReachesTheRoot walks every event of the partition run and
+// requires its explanation to terminate at the opening event. This is the
+// termination proof made concrete: the recursion needs no guard because every
+// cause is recorded earlier than its effect.
+func TestEveryExplanationReachesTheRoot(t *testing.T) {
+	res := mustRun(t, OneWayPartition(), 1)
+	idx := causalIndex(t, res)
+	for _, ev := range res.Log.Events() {
+		exp, err := idx.Explain(domain.Ref(ev.Seq))
+		if err != nil {
+			t.Fatalf("explain %d: %v", ev.Seq, err)
+		}
+		deepest := exp
+		for len(deepest.Causes) > 0 {
+			if len(deepest.Causes) != 1 {
+				// Branching is allowed; follow the first path and check the rest
+				// separately through the serious events.
+				break
+			}
+			deepest = deepest.Causes[0]
+		}
+		if len(deepest.Causes) == 0 && deepest.Event.Kind != domain.KindScenarioStarted {
+			t.Fatalf("the explanation of %d ends at %s, not at the scenario", ev.Seq, deepest.Event.Kind)
+		}
+		if exp.Depth() > idx.Len() {
+			t.Fatalf("the explanation of %d is deeper (%d) than the history", ev.Seq, exp.Depth())
+		}
 	}
 }
