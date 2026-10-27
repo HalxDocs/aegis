@@ -62,6 +62,10 @@ milestone, not a convention.
 
 ## 3. The canonical scenario and the exact timeline
 
+> **Changed in [Milestone 3](doc_m3.md).** The events described below are unchanged; each now also carries a
+> `causes` list naming the events that produced it, which is what lets the log be walked backwards. The canonical
+> run is still 16 events at the same instants, in the same order.
+
 Three nodes. B sends heartbeats to A and C. A and C watch B with independent deadlines. B crashes at 215 ms.
 
 | Parameter | Value |
