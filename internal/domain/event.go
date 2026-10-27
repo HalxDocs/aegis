@@ -115,6 +115,9 @@ type Event struct {
 // referenced event exists, and whether it truly came first, belongs to the
 // recorder, which is the only component that assigns sequence numbers.
 func (e Event) validateCauses() error {
+	if e.Kind == KindScenarioStarted && len(e.Causes) > 0 {
+		return fmt.Errorf("%w: %s opens the history and cannot cite a cause", ErrInvalidCause, e.Kind)
+	}
 	for i, cause := range e.Causes {
 		if !cause.Valid() {
 			return fmt.Errorf("%w: %s cites zero, which names no event", ErrInvalidCause, e.Kind)
