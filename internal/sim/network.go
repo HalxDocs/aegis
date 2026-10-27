@@ -209,8 +209,8 @@ func (n *network) send(at domain.Tick, msg Message, cause domain.Ref) (domain.Re
 		// and never reaches anyone. The loss is recorded at the arrival instant
 		// rather than the send, because that is when the message fails to
 		// arrive and when an observer's silence starts to mean something.
-		lost := w.cutDuring(at, arrives)
-		if _, err := n.sched.At(arrives, func() { n.arrive(arrives, msg, sent, lost) }); err != nil {
+		crossing := w.crossing(at, arrives)
+		if _, err := n.sched.At(arrives, func() { n.arrive(arrives, msg, sent, crossing) }); err != nil {
 			return 0, fmt.Errorf("schedule delivery of %s: %w", link, err)
 		}
 	}
@@ -233,12 +233,12 @@ func (n *network) send(at domain.Tick, msg Message, cause domain.Ref) (domain.Re
 }
 
 // arrive is what becomes of a message that was accepted by the sender.
-func (n *network) arrive(at domain.Tick, msg Message, sent domain.Ref, lost bool) {
-	if !lost {
+func (n *network) arrive(at domain.Tick, msg Message, sent domain.Ref, crossing *cut) {
+	if crossing == nil {
 		n.deliver(at, msg, sent)
 		return
 	}
-	if err := n.recordDrop(at, msg, sent, nil, domain.ReasonPartition); err != nil {
+	if err := n.recordDrop(at, msg, sent, crossing, domain.ReasonPartition); err != nil {
 		if n.fault != nil {
 			n.fault(err)
 		}
@@ -247,6 +247,11 @@ func (n *network) arrive(at domain.Tick, msg Message, sent domain.Ref, lost bool
 
 // recordDrop writes the outcome of a message that never reached its receiver.
 func (n *network) recordDrop(at domain.Tick, msg Message, sent domain.Ref, crossing *cut, reason string) error {
+	causes := []domain.Ref{sent}
+	if crossing != nil && crossing.announced.Valid() {
+		causes = append(causes, crossing.announced)
+		slices.Sort(causes)
+	}
 	_, err := n.rec.Record(domain.Event{
 		At:     at,
 		Kind:   domain.KindMessageDropped,
@@ -254,7 +259,7 @@ func (n *network) recordDrop(at domain.Tick, msg Message, sent domain.Ref, cross
 		Peer:   msg.To,
 		Round:  msg.Round,
 		Reason: reason,
-		Causes: []domain.Ref{sent},
+		Causes: causes,
 	})
 	return err
 }
