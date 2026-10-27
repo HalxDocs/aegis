@@ -180,3 +180,27 @@ func TestHeartbeatToAPeerWithoutALinkStopsTheRun(t *testing.T) {
 		t.Fatalf("Run error = %v, want ErrUnknownLink: an undeclared path must not be guessed", err)
 	}
 }
+
+// TestADeliveryCarriesTheReferenceOfItsSend is what makes a receipt citable: the
+// network hands the observer the reference of the send, not a description of it.
+func TestADeliveryCarriesTheReferenceOfItsSend(t *testing.T) {
+	net, sched, rec, got := newTestNetwork(t, 1)
+	if err := net.addLink(LinkConfig{From: "B", To: "A", Latency: tickAt(20)}); err != nil {
+		t.Fatal(err)
+	}
+	root, err := rec.Record(domain.Event{At: 0, Kind: domain.KindScenarioStarted, Scenario: "test"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	sent, err := net.send(tickAt(100), Message{From: "B", To: "A", Round: 1}, root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	runScheduler(t, sched)
+	if len(*got) != 1 {
+		t.Fatalf("deliveries = %d, want 1", len(*got))
+	}
+	if (*got)[0].cause != sent {
+		t.Fatalf("delivery carries %s, want the send event %s", (*got)[0].cause, sent)
+	}
+}
