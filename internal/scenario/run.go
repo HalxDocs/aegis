@@ -47,6 +47,13 @@ func Run(spec Spec, seed uint64) (Result, error) {
 		}
 	}
 
+	// The history opens before the observers are built, because a deadline
+	// armed at start-up has no evidence to cite and cites the scenario instead.
+	// Every configuration step that can fail for a user reason has already run.
+	if err := engine.Open(spec.Name); err != nil {
+		return Result{}, fmt.Errorf("scenario %s: %w", spec.Name, err)
+	}
+
 	observers := make([]*detector.Detector, 0, len(spec.Observers))
 	for _, o := range spec.Observers {
 		det, err := detector.New(detector.Config{
@@ -56,6 +63,7 @@ func Run(spec Spec, seed uint64) (Result, error) {
 			Scheduler: engine,
 			Recorder:  log,
 			Faults:    engine,
+			Root:      engine.Root(),
 		})
 		if err != nil {
 			return Result{}, fmt.Errorf("scenario %s: %w", spec.Name, err)
@@ -69,12 +77,6 @@ func Run(spec Spec, seed uint64) (Result, error) {
 		observers = append(observers, det)
 	}
 
-	// Everything that can fail for a user reason is configured, so the history
-	// can open. The observers are built after it because their first deadline is
-	// armed by the scenario and cites the opening event as its cause.
-	if err := engine.Open(spec.Name); err != nil {
-		return Result{}, fmt.Errorf("scenario %s: %w", spec.Name, err)
-	}
 	if err := engine.Start(); err != nil {
 		return Result{}, fmt.Errorf("scenario %s: %w", spec.Name, err)
 	}

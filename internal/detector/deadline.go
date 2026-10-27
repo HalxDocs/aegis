@@ -22,6 +22,10 @@ type monitor struct {
 	// exactly like a real failure.
 	epoch uint64
 
+	// evidence is the reference of the event that armed the current deadline:
+	// the receipt that re-armed it, or the scenario when it was armed at start.
+	evidence domain.Ref
+
 	timer domain.Timer
 }
 

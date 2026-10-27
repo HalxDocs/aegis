@@ -26,6 +26,11 @@ var (
 	// ErrInvalidTimeout is returned for a timeout that is not positive.
 	ErrInvalidTimeout = errors.New("detector timeout must be positive")
 
+	// ErrNoRoot is returned when a detector is created without the reference of
+	// the event that opened the history. A deadline armed before any evidence has
+	// to cite something, or the suspicion that follows it has no cause.
+	ErrNoRoot = errors.New("detector requires the root of the history")
+
 	// ErrAlreadyWatched is returned when a target is watched twice by the same
 	// observer, which would leave two deadlines racing for one belief.
 	ErrAlreadyWatched = errors.New("target is already watched")
@@ -57,6 +62,10 @@ type Config struct {
 	Scheduler domain.Scheduler
 	Recorder  EventRecorder
 	Faults    FaultSink
+
+	// Root is the reference of the scenario_started event. It is the cause of a
+	// suspicion whose deadline was armed before any message arrived.
+	Root domain.Ref
 }
 
 // Detector holds one observer's beliefs about the targets it was told to watch.
@@ -74,6 +83,7 @@ type Detector struct {
 
 	monitors map[domain.NodeID]*monitor
 	targets  []domain.NodeID
+	root     domain.Ref
 	reports  []domain.FailureReport
 }
 
@@ -97,6 +107,9 @@ func New(cfg Config) (*Detector, error) {
 	if cfg.Faults == nil {
 		return nil, ErrNoFaultSink
 	}
+	if !cfg.Root.Valid() {
+		return nil, ErrNoRoot
+	}
 	return &Detector{
 		observer: cfg.Observer,
 		timeout:  cfg.Timeout,
@@ -104,6 +117,7 @@ func New(cfg Config) (*Detector, error) {
 		sched:    cfg.Scheduler,
 		rec:      cfg.Recorder,
 		faults:   cfg.Faults,
+		root:     cfg.Root,
 		monitors: make(map[domain.NodeID]*monitor),
 	}, nil
 }
@@ -136,7 +150,7 @@ func (d *Detector) Watch(target domain.NodeID) error {
 		return fmt.Errorf("%w: %s watches %s", ErrAlreadyWatched, d.observer, target)
 	}
 
-	m := &monitor{obs: domain.NewObservation(d.observer, target)}
+	m := &monitor{obs: domain.NewObservation(d.observer, target), evidence: d.root}
 	d.monitors[target] = m
 	d.targets = append(d.targets, target)
 	slices.Sort(d.targets)
@@ -153,14 +167,15 @@ func (d *Detector) HeartbeatReceived(at domain.Tick, from, to domain.NodeID, rou
 	if to != d.observer {
 		return nil
 	}
-	if _, err := d.rec.Record(domain.Event{
+	receipt, err := d.rec.Record(domain.Event{
 		At:     at,
 		Kind:   domain.KindHeartbeatReceived,
 		Node:   from,
 		Peer:   to,
 		Round:  round,
 		Causes: []domain.Ref{cause},
-	}); err != nil {
+	})
+	if err != nil {
 		return fmt.Errorf("detector %s: record receipt from %s: %w", d.observer, from, err)
 	}
 
@@ -183,6 +198,9 @@ func (d *Detector) HeartbeatReceived(at domain.Tick, from, to domain.NodeID, rou
 		}
 	}
 	m.obs = next
+	// This receipt re-arms the deadline, so it is the evidence a later
+	// suspicion will cite.
+	m.evidence = receipt
 	return d.arm(from, m, at)
 }
 

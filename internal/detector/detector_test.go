@@ -16,6 +16,7 @@ func TestNewValidatesConfig(t *testing.T) {
 		Scheduler: clock,
 		Recorder:  &stubRecorder{},
 		Faults:    &stubFaults{},
+		Root:      1,
 	}
 
 	cases := map[string]struct {
@@ -28,6 +29,7 @@ func TestNewValidatesConfig(t *testing.T) {
 		"negative timeout":   {func(c *Config) { c.Timeout = -1 }, ErrInvalidTimeout},
 		"missing clock":      {func(c *Config) { c.Clock = nil }, ErrNoClock},
 		"missing scheduler":  {func(c *Config) { c.Scheduler = nil }, ErrNoScheduler},
+		"missing root":       {func(c *Config) { c.Root = 0 }, ErrNoRoot},
 		"missing recorder":   {func(c *Config) { c.Recorder = nil }, ErrNoRecorder},
 		"missing fault sink": {func(c *Config) { c.Faults = nil }, ErrNoFaultSink},
 	}

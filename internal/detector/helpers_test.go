@@ -206,6 +206,7 @@ func newHarness(t *testing.T, observer domain.NodeID, timeout domain.Tick) *harn
 		Scheduler: h.sched,
 		Recorder:  h.rec,
 		Faults:    h.faults,
+		Root:      1,
 	})
 	if err != nil {
 		t.Fatalf("New: %v", err)
