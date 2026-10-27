@@ -1,10 +1,12 @@
 package scenario
 
 import (
+	"os"
 	"testing"
 
 	"github.com/HalxDocs/aegis/internal/causal"
 	"github.com/HalxDocs/aegis/internal/domain"
+	"github.com/HalxDocs/aegis/internal/observability"
 )
 
 // causalIndex is the graph of a finished run, validated from its own log.
@@ -259,5 +261,38 @@ func TestTheGraphHoldsForFortySeeds(t *testing.T) {
 		if idx.Len() != res.Log.Len() {
 			t.Fatalf("seed %d: index is missing events", seed)
 		}
+	}
+}
+
+// TestTheCommittedFixtureExplainsItself runs the explainer over the artifact in
+// the repository rather than over a live run. If the two ever disagreed, the
+// file would be a description of a different world from the one the code builds.
+func TestTheCommittedFixtureExplainsItself(t *testing.T) {
+	f, err := os.Open("testdata/one-way-partition.jsonl")
+	if err != nil {
+		t.Fatalf("open fixture: %v", err)
+	}
+	defer f.Close()
+
+	events, err := observability.ReadJSONL(f)
+	if err != nil {
+		t.Fatalf("read fixture: %v", err)
+	}
+	idx, err := causal.New(events)
+	if err != nil {
+		t.Fatalf("the committed log is not a graph: %v", err)
+	}
+	if idx.Len() != 75 {
+		t.Fatalf("the fixture has %d events, want 75", idx.Len())
+	}
+	exp, err := idx.Explain(61)
+	if err != nil {
+		t.Fatalf("explain the recovery: %v", err)
+	}
+	if exp.Event.Kind != domain.KindSuspicionCleared {
+		t.Fatalf("event 61 is %s, want the recovery", exp.Event.Kind)
+	}
+	if len(exp.Causes) != 1 || exp.Causes[0].Event.Kind != domain.KindHeartbeatReceived {
+		t.Fatalf("the recovery cites %+v, want the receipt at 920 ms", exp.Causes)
 	}
 }
