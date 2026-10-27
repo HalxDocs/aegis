@@ -45,3 +45,19 @@ func TestNewRejectsAnEmptyHistory(t *testing.T) {
 		t.Fatalf("error = %v, want ErrEmptyHistory", err)
 	}
 }
+
+func TestNewRejectsAHistoryThatIsNotNumberedFromOne(t *testing.T) {
+	for name, mutate := range map[string]func([]domain.Event){
+		"gap":     func(e []domain.Event) { e[3].Seq = 9 },
+		"restart": func(e []domain.Event) { e[3].Seq = 3 },
+		"zero":    func(e []domain.Event) { e[0].Seq = 0 },
+	} {
+		t.Run(name, func(t *testing.T) {
+			events := sample()
+			mutate(events)
+			if _, err := New(events); !errors.Is(err, ErrBadSequence) {
+				t.Fatalf("error = %v, want ErrBadSequence", err)
+			}
+		})
+	}
+}
