@@ -121,3 +121,29 @@ func TestNewRejectsACauseDatestampedAfterItsEffect(t *testing.T) {
 		t.Fatalf("error = %v, want ErrFutureCause", err)
 	}
 }
+
+func TestAncestorsWalkBackToTheRoot(t *testing.T) {
+	idx, err := New(sample())
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := idx.Ancestors(5)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []domain.Ref{1, 2, 3, 4}
+	if len(got) != len(want) {
+		t.Fatalf("ancestors = %v, want %v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("ancestors = %v, want %v", got, want)
+		}
+	}
+	if got, err := idx.Ancestors(1); err != nil || len(got) != 0 {
+		t.Fatalf("the root has ancestors %v (err %v), want none", got, err)
+	}
+	if _, err := idx.Ancestors(9); !errors.Is(err, ErrUnknownRef) {
+		t.Fatalf("error = %v, want ErrUnknownRef", err)
+	}
+}

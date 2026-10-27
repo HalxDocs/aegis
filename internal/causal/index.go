@@ -16,6 +16,7 @@ package causal
 import (
 	"errors"
 	"fmt"
+	"slices"
 
 	"github.com/HalxDocs/aegis/internal/domain"
 )
@@ -126,4 +127,32 @@ func (i *Index) Len() int { return len(i.order) }
 func (i *Index) Event(ref domain.Ref) (domain.Event, bool) {
 	ev, ok := i.events[ref]
 	return ev, ok
+}
+
+// Ancestors returns every event ref is descended from, in increasing order.
+//
+// The event itself is not included: an ancestry is the set of reasons, not the
+// thing they justify.
+func (i *Index) Ancestors(ref domain.Ref) ([]domain.Ref, error) {
+	if _, ok := i.events[ref]; !ok {
+		return nil, fmt.Errorf("%w: %s", ErrUnknownRef, ref)
+	}
+	seen := make(map[domain.Ref]struct{})
+	var walk func(domain.Ref)
+	walk = func(at domain.Ref) {
+		for _, cause := range i.events[at].Causes {
+			if _, ok := seen[cause]; ok {
+				continue
+			}
+			seen[cause] = struct{}{}
+			walk(cause)
+		}
+	}
+	walk(ref)
+	out := make([]domain.Ref, 0, len(seen))
+	for cause := range seen {
+		out = append(out, cause)
+	}
+	slices.Sort(out)
+	return out, nil
 }
