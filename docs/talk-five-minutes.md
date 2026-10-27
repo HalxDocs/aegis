@@ -79,7 +79,25 @@ stories and three words.
 > the entire time. Every observer was right about everything it could observe. And the repair fixed the network,
 > not the opinion.
 
-## 4:00 — Why you should believe any of this
+## 3:50 — Why he believed it
+
+> Everything I have said so far comes from two tables of events. Here is the part that makes it evidence rather than
+> a story. Every event in the log names the events that caused it, so I can ask the log itself why A did that.
+
+*(run `make explain`)*
+
+> Fourteen: A distrusts B at 570 milliseconds. Below it, the reasons. The last heartbeat arrived at 220. That message
+> was sent at 200. That round came from the round before it. That came from B starting. That came from the scenario.
+>
+> Six lines, and the crash is not in them. Not because I edited anything — because nothing was ever delivered from
+> the crash to A. The cause list is written when the event is written, by the component that knew the reason, and it
+> is checked: a cause that points forwards is refused, and a run whose events do not all trace back to the scenario
+> does not pass its own tests.
+>
+> And the repair? Ask why A trusted B again. The answer is the arrival at 920. The repair at 900 is in the log and
+> explains nothing, because a wire coming back is not evidence until something crosses it.
+
+## 4:20 — Why you should believe any of this
 
 > Two things make this more than an animation.
 >
@@ -94,7 +112,7 @@ stories and three words.
 > partition — compared byte for byte on every commit. Change the simulation and the diff tells you what you
 > changed.
 
-## 4:45 — Close
+## 5:00 — Close
 
 > So, two failures. One where the truth changed and the beliefs followed late. One where the truth never changed
 > and the beliefs were wrong anyway.
@@ -103,8 +121,9 @@ stories and three words.
 > *machine*. The gap between those is measurable — and if you don't measure it, you'll be guessing during your
 > worst hour.
 >
-> Next, we make the log explain *why* each belief changed, not just when. That's the point where you can start
-> doing recovery that's actually justified.
+> The log now explains each belief: the reason is written down when it happens, and it can only cite something that
+> already happened. Which means the next thing we can build — recovery that acts on evidence instead of on a guess —
+> starts from something we can check.
 
 ---
 
