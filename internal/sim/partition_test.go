@@ -239,8 +239,8 @@ func TestCutsAreKeptInStartOrder(t *testing.T) {
 		t.Fatalf("cuts = %+v, want %+v", got, want)
 	}
 	for i := range want {
-		if got[i] != want[i] {
-			t.Fatalf("cut %d = %+v, want %+v", i, got[i], want[i])
+		if *got[i] != want[i] {
+			t.Fatalf("cut %d = %+v, want %+v", i, *got[i], want[i])
 		}
 	}
 }

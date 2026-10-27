@@ -68,7 +68,7 @@ type wire struct {
 	// configuration, not runtime state: whether a message is lost depends only on
 	// the intervals and the message's own transit, never on which task happened
 	// to run first at a boundary instant.
-	cuts []cut
+	cuts []*cut
 }
 
 // cut is a one-way outage, half-open in time: the path is unusable from from up
@@ -76,6 +76,11 @@ type wire struct {
 type cut struct {
 	from  domain.Tick
 	until domain.Tick
+
+	// announced is the reference of the link_partitioned event once the run
+	// reaches the start of the cut. A message lost inside it cites that event,
+	// which is how a drop explains itself.
+	announced domain.Ref
 }
 
 // crosses reports whether a message that left at start and arrives at end was
@@ -95,12 +100,17 @@ func (c cut) crosses(start, end domain.Tick) bool {
 // A message sent before a cut and due after it started is lost in flight, which
 // is why the whole transit is tested rather than the send instant alone.
 func (w wire) cutDuring(start, end domain.Tick) bool {
+	return w.crossing(start, end) != nil
+}
+
+// crossing returns the configured cut a transit passes through, if any.
+func (w wire) crossing(start, end domain.Tick) *cut {
 	for _, c := range w.cuts {
 		if c.crosses(start, end) {
-			return true
+			return c
 		}
 	}
-	return false
+	return nil
 }
 
 type network struct {
@@ -161,11 +171,13 @@ func (n *network) validateCut(link domain.Link, from, until domain.Tick) error {
 }
 
 // addCut records a validated outage, keeping the link's cuts ordered by start.
-func (n *network) addCut(link domain.Link, from, until domain.Tick) {
+func (n *network) addCut(link domain.Link, from, until domain.Tick) *cut {
 	w := n.links[link]
+	fresh := &cut{from: from, until: until}
 	at := sort.Search(len(w.cuts), func(i int) bool { return w.cuts[i].from > from })
-	w.cuts = slices.Insert(w.cuts, at, cut{from: from, until: until})
+	w.cuts = slices.Insert(w.cuts, at, fresh)
 	n.links[link] = w
+	return fresh
 }
 
 // send puts a message on the wire at the given virtual time.

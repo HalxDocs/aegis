@@ -85,20 +85,29 @@ func (e *Engine) PartitionAt(from, to domain.NodeID, at, until domain.Tick) erro
 	if at < e.sched.now {
 		return fmt.Errorf("%w: cut at %d, now %d", ErrScheduleInPast, at, e.sched.now)
 	}
-	e.net.addCut(link, at, until)
-	for _, mark := range []struct {
-		at   domain.Tick
-		kind domain.Kind
-	}{
-		{at, domain.KindLinkPartitioned},
-		{until, domain.KindLinkRestored},
-	} {
-		if _, err := e.sched.At(mark.at, func() {
-			_, err := e.record(domain.Event{At: mark.at, Kind: mark.kind, Node: link.From, Peer: link.To})
-			e.fail(err)
-		}); err != nil {
-			return fmt.Errorf("schedule %s of %s at %d: %w", mark.kind, link, mark.at, err)
-		}
+	outage := e.net.addCut(link, at, until)
+
+	// The announcement runs before any message scheduled at the same instant,
+	// because the cut was scheduled when the scenario was configured. That is
+	// what lets a message lost at the start of the cut cite it.
+	if _, err := e.sched.At(at, func() {
+		ref, err := e.record(domain.Event{
+			At: at, Kind: domain.KindLinkPartitioned, Node: link.From, Peer: link.To,
+			Causes: []domain.Ref{e.root},
+		})
+		outage.announced = ref
+		e.fail(err)
+	}); err != nil {
+		return fmt.Errorf("schedule %s of %s at %d: %w", domain.KindLinkPartitioned, link, at, err)
+	}
+	if _, err := e.sched.At(until, func() {
+		_, err := e.record(domain.Event{
+			At: until, Kind: domain.KindLinkRestored, Node: link.From, Peer: link.To,
+			Causes: []domain.Ref{outage.announced},
+		})
+		e.fail(err)
+	}); err != nil {
+		return fmt.Errorf("schedule %s of %s at %d: %w", domain.KindLinkRestored, link, until, err)
 	}
 	return nil
 }
