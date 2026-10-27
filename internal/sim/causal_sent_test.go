@@ -66,3 +66,50 @@ func (r *stubRecorder) refOf(ev domain.Event) domain.Ref {
 	}
 	return 0
 }
+
+// TestEachDirectionHasItsOwnChain pins the scope of the send chain. A node with
+// two peers sends two messages per round; one chain for the node would claim the
+// second link's round one caused the first link's round two.
+func TestEachDirectionHasItsOwnChain(t *testing.T) {
+	e, rec := newTestEngine(t, EngineConfig{})
+	for _, id := range []domain.NodeID{"A", "C"} {
+		if err := e.AddNode(NodeConfig{ID: id}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := e.AddNode(NodeConfig{ID: "B", HeartbeatEvery: tickAt(100), Peers: []domain.NodeID{"A", "C"}}); err != nil {
+		t.Fatal(err)
+	}
+	for _, peer := range []domain.NodeID{"A", "C"} {
+		if err := e.AddLink(LinkConfig{From: "B", To: peer, Latency: tickAt(20)}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := e.AddReceiver(&stubReceiver{}); err != nil {
+		t.Fatal(err)
+	}
+	if err := e.Start(); err != nil {
+		t.Fatal(err)
+	}
+	if err := e.Run(tickAt(250)); err != nil {
+		t.Fatal(err)
+	}
+
+	byPeer := map[domain.NodeID][]domain.Event{}
+	for _, ev := range rec.ofKind(domain.KindHeartbeatSent) {
+		byPeer[ev.Peer] = append(byPeer[ev.Peer], ev)
+	}
+	if len(byPeer["A"]) != 2 || len(byPeer["C"]) != 2 {
+		t.Fatalf("sends per direction = %d and %d, want two rounds each", len(byPeer["A"]), len(byPeer["C"]))
+	}
+	for peer, sends := range byPeer {
+		if want := []domain.Ref{rec.refOf(sends[0])}; !equalRefs(sends[1].Causes, want) {
+			t.Fatalf("B->%s round 2 cites %v, want its own round 1 %v", peer, sends[1].Causes, want)
+		}
+	}
+	// The two round-one sends cite the same start, not each other.
+	if byPeer["A"][0].Causes[0] != byPeer["C"][0].Causes[0] {
+		t.Fatalf("round one cites %v for A and %v for C, want the same node start",
+			byPeer["A"][0].Causes, byPeer["C"][0].Causes)
+	}
+}
