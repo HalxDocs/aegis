@@ -73,3 +73,17 @@ func TestExplainRequiresAReference(t *testing.T) {
 		t.Fatal("explain ran without being told which event to explain")
 	}
 }
+
+func TestExplainingTheRootShowsOneLine(t *testing.T) {
+	out, err := runCLI(t, "explain", "-scenario", "node-crash", "-ref", "1")
+	if err != nil {
+		t.Fatalf("explain: %v", err)
+	}
+	lines := strings.Split(strings.TrimSpace(out), "\n")
+	if len(lines) != 1 {
+		t.Fatalf("lines = %d, want the opening event alone:\n%s", len(lines), out)
+	}
+	if !strings.Contains(lines[0], "scenario_started") {
+		t.Fatalf("line = %q, want the scenario", lines[0])
+	}
+}
