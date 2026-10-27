@@ -8,6 +8,9 @@ import (
 // ErrInvalidEvent identifies an event that cannot be appended to the history.
 var ErrInvalidEvent = errors.New("invalid event")
 
+// ErrInvalidCause identifies a causal reference that cannot be followed.
+var ErrInvalidCause = errors.New("invalid cause")
+
 // Kind names a class of event in the recorded history. The vocabulary is
 // closed: an unknown string is rejected rather than written, so a typo cannot
 // produce a log that silently loses information.
@@ -105,6 +108,21 @@ type Event struct {
 	Causes []Ref `json:"causes,omitempty"`
 }
 
+// validateCauses checks the references an event carries.
+//
+// This method can only enforce what is visible on the event itself: that each
+// reference names something, and that the list is canonical. Whether the
+// referenced event exists, and whether it truly came first, belongs to the
+// recorder, which is the only component that assigns sequence numbers.
+func (e Event) validateCauses() error {
+	for _, cause := range e.Causes {
+		if !cause.Valid() {
+			return fmt.Errorf("%w: %s cites zero, which names no event", ErrInvalidCause, e.Kind)
+		}
+	}
+	return nil
+}
+
 // Validate checks the fields required by the event's kind.
 func (e Event) Validate() error {
 	if !e.Kind.Valid() {
@@ -112,6 +130,9 @@ func (e Event) Validate() error {
 	}
 	if e.At < 0 {
 		return fmt.Errorf("%w: negative virtual time %d", ErrInvalidEvent, e.At)
+	}
+	if err := e.validateCauses(); err != nil {
+		return err
 	}
 	if e.Kind == KindScenarioStarted || e.Kind == KindScenarioFinished {
 		if e.Scenario == "" {
