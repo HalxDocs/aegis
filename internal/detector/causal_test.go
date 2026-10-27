@@ -96,3 +96,20 @@ func TestARecoveryCitesTheMessageThatClearedIt(t *testing.T) {
 			cleared[0].Causes, raised.Causes)
 	}
 }
+
+func TestAnObserverThatNeverHeardAnythingCitesTheScenario(t *testing.T) {
+	h := rootedHarness(t, "A", tickAt(350))
+	h.mustWatch(t, "B")
+	h.sched.run(tickAt(400), true)
+
+	raised := h.rec.ofKind(domain.KindSuspicionRaised)
+	if len(raised) != 1 {
+		t.Fatalf("suspicion events = %d, want 1", len(raised))
+	}
+	if want := domain.Ref(1); len(raised[0].Causes) != 1 || raised[0].Causes[0] != want {
+		t.Fatalf("suspicion cites %v, want the scenario %d: no message armed this deadline", raised[0].Causes, want)
+	}
+	if h.rec.count(domain.KindHeartbeatReceived) != 0 {
+		t.Fatal("the harness received a message it did not expect")
+	}
+}
