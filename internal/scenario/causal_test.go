@@ -131,3 +131,42 @@ func TestNoBeliefIsDescendedFromGroundTruth(t *testing.T) {
 		}
 	}
 }
+
+// TestTheRepairExplainsNothing is the second claim, and the less obvious one.
+// A repair is recorded, cites the cut it ends, and is cited by nothing at all:
+// no belief anywhere in the run rests on the wire coming back.
+func TestTheRepairExplainsNothing(t *testing.T) {
+	res := mustRun(t, OneWayPartition(), 1)
+	idx := causalIndex(t, res)
+
+	restored := refOfEvent(t, res, domain.KindLinkRestored)
+	if descendants, err := idx.Descendants(restored); err != nil {
+		t.Fatal(err)
+	} else if len(descendants) != 0 {
+		t.Fatalf("the repair explains %v, but repairing a path does not change a belief", descendants)
+	}
+
+	// The suspicion's ancestry stops at the last evidence, which arrived before
+	// the cut: the graph says why A acted, not why nothing further arrived.
+	cut := refOfEvent(t, res, domain.KindLinkPartitioned)
+	suspicion := refOfEvent(t, res, domain.KindSuspicionRaised)
+	ancestors, err := idx.Ancestors(suspicion)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, cause := range ancestors {
+		if cause == cut {
+			t.Fatal("the suspicion is descended from the cut, which no observer saw")
+		}
+	}
+	// Recovery, by contrast, is descended from an arrival after the repair.
+	cleared := refOfEvent(t, res, domain.KindSuspicionCleared)
+	ev, _ := idx.Event(cleared)
+	if len(ev.Causes) != 1 {
+		t.Fatalf("the recovery cites %v, want the receipt that cleared it", ev.Causes)
+	}
+	last, _ := idx.Event(ev.Causes[0])
+	if last.At != tick(920) {
+		t.Fatalf("the recovery is explained by an event at %d, want the arrival at 920 ms", last.At)
+	}
+}
