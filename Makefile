@@ -1,7 +1,8 @@
 GO ?= go
 SCENARIOS ?= node-crash one-way-partition
+REF ?= 14
 
-.PHONY: all build fmt fmt-check vet test race check cover replay demo clean
+.PHONY: all build fmt fmt-check vet test race check cover replay demo explain clean
 
 all: check
 
@@ -52,6 +53,9 @@ replay:
 
 demo:
 	$(GO) run ./cmd/aegis run --scenario node-crash --format table
+
+explain:
+	$(GO) run ./cmd/aegis explain -scenario node-crash -ref $(REF)
 
 clean:
 	$(GO) clean ./...
