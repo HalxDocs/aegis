@@ -67,6 +67,17 @@ func (r *stubReceiver) HeartbeatReceived(at domain.Tick, from, to domain.NodeID,
 
 func newTestEngine(t *testing.T, cfg EngineConfig) (*Engine, *stubRecorder) {
 	t.Helper()
+	e, rec := unopenedEngine(t, cfg)
+	if err := e.Open("test"); err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	return e, rec
+}
+
+// unopenedEngine builds a simulator with no history open, for the tests that
+// are about what happens at the boundary of a run.
+func unopenedEngine(t *testing.T, cfg EngineConfig) (*Engine, *stubRecorder) {
+	t.Helper()
 	rec, ok := cfg.Recorder.(*stubRecorder)
 	if !ok {
 		rec = &stubRecorder{}

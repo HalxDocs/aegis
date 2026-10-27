@@ -8,7 +8,7 @@ import (
 )
 
 func TestOpenRecordsTheRootOfTheGraph(t *testing.T) {
-	e, rec := newTestEngine(t, EngineConfig{})
+	e, rec := unopenedEngine(t, EngineConfig{})
 	if err := e.Open("node-crash"); err != nil {
 		t.Fatalf("Open: %v", err)
 	}
@@ -28,14 +28,14 @@ func TestOpenRecordsTheRootOfTheGraph(t *testing.T) {
 }
 
 func TestRootIsZeroBeforeTheHistoryOpens(t *testing.T) {
-	e, _ := newTestEngine(t, EngineConfig{})
+	e, _ := unopenedEngine(t, EngineConfig{})
 	if got := e.Root(); got != 0 {
 		t.Fatalf("Root() = %s before Open, want zero", got)
 	}
 }
 
 func TestOpenTwiceIsRefused(t *testing.T) {
-	e, _ := newTestEngine(t, EngineConfig{})
+	e, _ := unopenedEngine(t, EngineConfig{})
 	if err := e.Open("node-crash"); err != nil {
 		t.Fatal(err)
 	}
@@ -45,7 +45,7 @@ func TestOpenTwiceIsRefused(t *testing.T) {
 }
 
 func TestOpenAfterStartIsRefused(t *testing.T) {
-	e, _ := newTestEngine(t, EngineConfig{})
+	e, _ := unopenedEngine(t, EngineConfig{})
 	if err := e.Start(); err != nil {
 		t.Fatal(err)
 	}
@@ -55,7 +55,7 @@ func TestOpenAfterStartIsRefused(t *testing.T) {
 }
 
 func TestCloseCitesTheOpeningEvent(t *testing.T) {
-	e, rec := newTestEngine(t, EngineConfig{})
+	e, rec := unopenedEngine(t, EngineConfig{})
 	if err := e.Open("node-crash"); err != nil {
 		t.Fatal(err)
 	}
@@ -72,7 +72,7 @@ func TestCloseCitesTheOpeningEvent(t *testing.T) {
 }
 
 func TestCloseWithoutOpenIsRefused(t *testing.T) {
-	e, _ := newTestEngine(t, EngineConfig{})
+	e, _ := unopenedEngine(t, EngineConfig{})
 	if err := e.Close("node-crash"); !errors.Is(err, ErrNotStarted) {
 		t.Fatalf("error = %v, want ErrNotStarted", err)
 	}
