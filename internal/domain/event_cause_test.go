@@ -24,3 +24,25 @@ func TestEventRejectsAZeroCause(t *testing.T) {
 		t.Fatalf("error = %v, want ErrInvalidCause", err)
 	}
 }
+
+func TestCausesMustBeStrictlyIncreasing(t *testing.T) {
+	for name, causes := range map[string][]Ref{
+		"repeated":   {4, 4},
+		"descending": {5, 2},
+	} {
+		t.Run(name, func(t *testing.T) {
+			if err := suspected(causes...).Validate(); !errors.Is(err, ErrInvalidCause) {
+				t.Fatalf("error = %v, want ErrInvalidCause", err)
+			}
+		})
+	}
+	if err := suspected(2, 5, 9).Validate(); err != nil {
+		t.Fatalf("ascending causes were rejected: %v", err)
+	}
+}
+
+func TestASingleCauseNeedsNoOrdering(t *testing.T) {
+	if err := suspected(9).Validate(); err != nil {
+		t.Fatalf("one cause was rejected: %v", err)
+	}
+}
