@@ -87,3 +87,11 @@ func TestNewRejectsCausesOutOfOrder(t *testing.T) {
 		t.Fatalf("error = %v, want ErrUnsortedCauses", err)
 	}
 }
+
+func TestNewRejectsACauseOutsideTheHistory(t *testing.T) {
+	events := sample()
+	events[2].Causes = []domain.Ref{9}
+	if _, err := New(events); !errors.Is(err, ErrDanglingCause) {
+		t.Fatalf("error = %v, want ErrDanglingCause", err)
+	}
+}
