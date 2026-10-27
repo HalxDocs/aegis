@@ -135,11 +135,15 @@ anything else, get those right; the whole argument lives in them.
 **The pause that matters** is after "the repair does nothing." Don't fill it. That's the moment the room gets it.
 
 **If you're running short,** cut the determinism section down to one line: "the log is a committed file, compared
-byte for byte." Keep both stories.
+byte for byte." Keep both stories and the explain beat — that one is the proof.
 
 **If someone asks how this differs from a real system,** the honest answer: it's a simulation, single-threaded,
 and a message caught in a cut is lost rather than delayed. It models the reasoning faithfully; it doesn't model
 TCP.
+
+**If someone asks what the cause list cannot say,** tell them: it cannot record an absence. A's suspicion is
+explained by its last evidence; the cut that stopped the next one is not in that chain, because a thing that did not
+arrive is not an event.
 
 **If the demo breaks,** the tables in the [README](../README.md) carry the same numbers, and
 [doc_m2.md](../doc_m2.md) has the timeline written out. Talk over those instead; nobody will know.
@@ -155,3 +159,6 @@ TCP.
 | A suspects at 570 ms and recovers at 920 ms | `one-way-partition` run, events 36 and 61 |
 | round nine departs at 900 ms, exactly as the path heals, and arrives | `one-way-partition` run, events 57–60 |
 | 16 and 75 events, compared byte for byte | `make replay` |
+| event 14 cites 12, which cites 9 | `make explain`, and the `causes` field of the crash run |
+| the crash has no descendants in the graph | `TestNoBeliefIsDescendedFromGroundTruth` |
+| the repair has no descendants either | `TestTheRepairExplainsNothing` |
