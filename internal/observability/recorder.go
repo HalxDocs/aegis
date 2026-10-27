@@ -20,6 +20,9 @@ var (
 	// has not issued yet. Causes point backwards or they are not causes.
 	ErrFutureCause = errors.New("cause has not been recorded")
 
+	// ErrDamagedLog is returned when a history cannot be read back as written.
+	ErrDamagedLog = errors.New("damaged log")
+
 	// ErrPreassignedSeq is returned when a caller supplies its own sequence
 	// number. Sequence is the recorder's to assign; a second numbering scheme
 	// is how two histories quietly diverge.
@@ -83,6 +86,32 @@ func (r *Recorder) Event(ref domain.Ref) (domain.Event, bool) {
 		return domain.Event{}, false
 	}
 	return r.events[ref-1], true
+}
+
+// ReadJSONL decodes a history written by WriteJSONL.
+//
+// Reading is strict: a line that does not decode, or an event whose sequence does
+// not match its position, is an error rather than a skipped line. A loader that
+// tolerates damage turns a corrupted artifact into a plausible one, and this file
+// is the artifact.
+func ReadJSONL(r io.Reader) ([]domain.Event, error) {
+	dec := json.NewDecoder(r)
+	var out []domain.Event
+	for {
+		var ev domain.Event
+		err := dec.Decode(&ev)
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		if err != nil {
+			return nil, fmt.Errorf("%w: event %d: %v", ErrDamagedLog, len(out)+1, err)
+		}
+		if ev.Seq != uint64(len(out)+1) {
+			return nil, fmt.Errorf("%w: position %d carries sequence %d", ErrDamagedLog, len(out)+1, ev.Seq)
+		}
+		out = append(out, ev)
+	}
+	return out, nil
 }
 
 // Events returns a copy of the history in sequence order.
