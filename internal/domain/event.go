@@ -87,8 +87,8 @@ const (
 //
 // Seq is assigned by the recorder. Node is the event's subject, Peer the
 // counterpart where one exists, Round the heartbeat round for message events,
-// Reason the machine-readable cause, and Scenario the run's name on the opening
-// and closing events.
+// Reason the machine-readable cause, Scenario the run's name on the opening and
+// closing events, and Causes the references that explain why it happened.
 type Event struct {
 	Seq      uint64 `json:"seq"`
 	At       Tick   `json:"at"`
@@ -98,6 +98,11 @@ type Event struct {
 	Round    uint64 `json:"round,omitempty"`
 	Reason   string `json:"reason,omitempty"`
 	Scenario string `json:"scenario,omitempty"`
+
+	// Causes names the events that produced this one, in strictly increasing
+	// order. The recorder rejects a reference that does not exist yet, so the
+	// history stays a graph that only points backwards.
+	Causes []Ref `json:"causes,omitempty"`
 }
 
 // Validate checks the fields required by the event's kind.
