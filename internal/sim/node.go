@@ -56,8 +56,12 @@ type node struct {
 	every domain.Tick
 	peers []domain.NodeID
 	round uint64
-	timer domain.Timer
-	eng   *Engine
+
+	// started is the reference of this node's own start event, which is the
+	// cause of its first heartbeat.
+	started domain.Ref
+	timer   domain.Timer
+	eng     *Engine
 }
 
 func newNode(cfg NodeConfig, eng *Engine) *node {
@@ -77,9 +81,16 @@ func (n *node) start(at domain.Tick) error {
 	if n.state != domain.StateRunning {
 		return fmt.Errorf("node %s: cannot start while %s", n.id, n.state)
 	}
-	if _, err := n.eng.record(domain.Event{At: at, Kind: domain.KindNodeStarted, Node: n.id}); err != nil {
+	started, err := n.eng.record(domain.Event{
+		At:     at,
+		Kind:   domain.KindNodeStarted,
+		Node:   n.id,
+		Causes: []domain.Ref{n.eng.Root()},
+	})
+	if err != nil {
 		return fmt.Errorf("node %s: record start: %w", n.id, err)
 	}
+	n.started = started
 	if n.every == 0 {
 		return nil
 	}
