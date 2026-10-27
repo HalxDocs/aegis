@@ -193,6 +193,26 @@ there. Putting the second set in the recorder would have meant asking it to know
 the checks at write time entirely; every scenario run is validated with `Result.Causal()` in tests, so a writer
 that forgets a cause fails the build rather than the demonstration.
 
+### What changed while building this
+
+Three things moved after the design settled, and all three are worth recording.
+
+**A `deadline_armed` event was designed and then dropped.** The first sketch recorded every arming of a deadline, so
+a suspicion could cite the arm and the arm could cite the receipt, with the timeout visible in between. It was cut
+because it doubles the size of the partition log (every arrival re-arms) to express something the receipt plus the
+report's own `Timeout` field already say. The monitor keeps the reference instead, and the arithmetic stays a
+property of the report rather than of the graph.
+
+**The detector and the runner had to change together.** A detector cannot be built without the root of the history,
+and only the runner knows it, so arming a deadline and opening the history became one commit. That commit also moved
+`engine.Open` ahead of the observers, which trades the old "a configuration error writes nothing" property for "a
+configuration error writes one event that is then discarded with the run".
+
+**The gate itself was broken for a while.** The commit script checked `go test ./... | tail`, which reports tail's
+exit status, and one commit went in with a failing test in `internal/causal`. The test was fixed, the commit
+corrected, and the script now sets `pipefail`; the failure is recorded here because a verification story that hides
+its own failure is not one.
+
 ## 7. Failure modes, and what stops them
 
 | failure | what it would look like | what stops it |
@@ -227,7 +247,27 @@ and virtual time, and nothing enforces that they are the same shape.
 **The explanation is a tree, not a proof.** It shows the reasons an event rests on. It does not show that those
 reasons were sufficient, and the same chain would be produced whether or not the writer's reasoning was sound.
 
-## 9. Verification
+## 9. How to read a chain
+
+```
+aegis explain -ref <seq> [-scenario node-crash|one-way-partition] [-seed N] [-depth N]
+```
+
+`-ref` is required and is a sequence number, not a timestamp: the log is numbered, and the number is the identity the
+causes cite. `-depth` limits how far back to walk; a branch that is cut off prints `...` rather than stopping
+silently. `-seed` matters only for scenarios with random loss, since a different draw is a different history and a
+different numbering.
+
+Reading tips that hold for every chain:
+
+- **Read upwards.** The top line is the event; everything below it is a reason for the line above, indented under it.
+- **A branch is a conjunction.** Two causes at the same level both contributed; neither is the "real" one.
+- **The bottom of every chain is the scenario.** An event that stops earlier than that is a defect, and the index
+  refuses it.
+- **A missing event is information.** If the crash is not in a suspicion's ancestry, that is not a hole in the log:
+  it is the statement that the crash never reached the observer.
+
+## 10. Verification
 
 ```
 gofmt -l .          # empty
