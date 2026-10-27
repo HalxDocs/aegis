@@ -94,7 +94,8 @@ func (e *Engine) PartitionAt(from, to domain.NodeID, at, until domain.Tick) erro
 		{until, domain.KindLinkRestored},
 	} {
 		if _, err := e.sched.At(mark.at, func() {
-			e.fail(e.record(domain.Event{At: mark.at, Kind: mark.kind, Node: link.From, Peer: link.To}))
+			_, err := e.record(domain.Event{At: mark.at, Kind: mark.kind, Node: link.From, Peer: link.To})
+			e.fail(err)
 		}); err != nil {
 			return fmt.Errorf("schedule %s of %s at %d: %w", mark.kind, link, mark.at, err)
 		}

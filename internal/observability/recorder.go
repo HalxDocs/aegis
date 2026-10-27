@@ -33,27 +33,29 @@ type Recorder struct {
 // NewRecorder returns an empty history.
 func NewRecorder() *Recorder { return &Recorder{} }
 
-// Record validates an event and appends it with the next sequence number.
+// Record validates an event, appends it with the next sequence number, and
+// returns that number as the reference later events cite.
 //
 // The event is appended only after validation succeeds, so a rejected event
 // never leaves a hole in the sequence.
-func (r *Recorder) Record(ev domain.Event) error {
+func (r *Recorder) Record(ev domain.Event) (domain.Ref, error) {
 	if ev.Seq != 0 {
-		return fmt.Errorf("%w: seq %d", ErrPreassignedSeq, ev.Seq)
+		return 0, fmt.Errorf("%w: seq %d", ErrPreassignedSeq, ev.Seq)
 	}
 	if err := ev.Validate(); err != nil {
-		return err
+		return 0, err
 	}
 	if n := len(r.events); n > 0 {
 		if prev := r.events[n-1]; ev.At < prev.At {
-			return fmt.Errorf("%w: %s at %d follows %s at %d",
+			return 0, fmt.Errorf("%w: %s at %d follows %s at %d",
 				ErrOutOfOrder, ev.Kind, ev.At, prev.Kind, prev.At)
 		}
 	}
 
-	ev.Seq = uint64(len(r.events) + 1)
+	ref := domain.Ref(len(r.events) + 1)
+	ev.Seq = uint64(ref)
 	r.events = append(r.events, ev)
-	return nil
+	return ref, nil
 }
 
 // Events returns a copy of the history in sequence order.

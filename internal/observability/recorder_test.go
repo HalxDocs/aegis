@@ -18,7 +18,7 @@ func TestRecordAssignsSequenceFromOne(t *testing.T) {
 	r := NewRecorder()
 	for i, at := range []domain.Tick{0, 10, 10, 20} {
 		ev := domain.Event{At: at, Kind: domain.KindHeartbeatSent, Node: "B", Peer: "A", Round: uint64(i + 1)}
-		if err := r.Record(ev); err != nil {
+		if _, err := r.Record(ev); err != nil {
 			t.Fatalf("Record(%d): %v", i, err)
 		}
 	}
@@ -38,13 +38,13 @@ func TestRecordAssignsSequenceFromOne(t *testing.T) {
 
 func TestRecordRejectsInvalidEventWithoutAdvancingSequence(t *testing.T) {
 	r := NewRecorder()
-	if err := r.Record(domain.Event{At: 1, Kind: domain.KindHeartbeatSent, Node: "B"}); err == nil {
+	if _, err := r.Record(domain.Event{At: 1, Kind: domain.KindHeartbeatSent, Node: "B"}); err == nil {
 		t.Fatal("event without a peer must be rejected")
 	}
 	if r.Len() != 0 {
 		t.Fatalf("Len() = %d, want 0 after a rejected event", r.Len())
 	}
-	if err := r.Record(event(domain.KindHeartbeatSent, 1)); err != nil {
+	if _, err := r.Record(event(domain.KindHeartbeatSent, 1)); err != nil {
 		t.Fatalf("Record after rejection: %v", err)
 	}
 	if got := r.Events()[0].Seq; got != 1 {
@@ -54,10 +54,10 @@ func TestRecordRejectsInvalidEventWithoutAdvancingSequence(t *testing.T) {
 
 func TestRecordRejectsEventThatMovesBackwards(t *testing.T) {
 	r := NewRecorder()
-	if err := r.Record(event(domain.KindHeartbeatSent, 20)); err != nil {
+	if _, err := r.Record(event(domain.KindHeartbeatSent, 20)); err != nil {
 		t.Fatal(err)
 	}
-	err := r.Record(event(domain.KindHeartbeatSent, 19))
+	_, err := r.Record(event(domain.KindHeartbeatSent, 19))
 	if !errors.Is(err, ErrOutOfOrder) {
 		t.Fatalf("error = %v, want ErrOutOfOrder", err)
 	}
@@ -69,7 +69,7 @@ func TestRecordRejectsEventThatMovesBackwards(t *testing.T) {
 func TestRecordAllowsRepeatedTimestamps(t *testing.T) {
 	r := NewRecorder()
 	for i := 0; i < 2; i++ {
-		if err := r.Record(event(domain.KindHeartbeatSent, 100)); err != nil {
+		if _, err := r.Record(event(domain.KindHeartbeatSent, 100)); err != nil {
 			t.Fatalf("record at the same instant: %v", err)
 		}
 	}
@@ -82,7 +82,7 @@ func TestRecordRejectsPreassignedSequence(t *testing.T) {
 	r := NewRecorder()
 	ev := event(domain.KindHeartbeatSent, 1)
 	ev.Seq = 7
-	err := r.Record(ev)
+	_, err := r.Record(ev)
 	if !errors.Is(err, ErrPreassignedSeq) {
 		t.Fatalf("error = %v, want ErrPreassignedSeq", err)
 	}
@@ -90,7 +90,7 @@ func TestRecordRejectsPreassignedSequence(t *testing.T) {
 
 func TestEventsReturnsACopy(t *testing.T) {
 	r := NewRecorder()
-	if err := r.Record(event(domain.KindHeartbeatSent, 1)); err != nil {
+	if _, err := r.Record(event(domain.KindHeartbeatSent, 1)); err != nil {
 		t.Fatal(err)
 	}
 	events := r.Events()
@@ -109,7 +109,7 @@ func TestWriteJSONLIsStableAndComplete(t *testing.T) {
 		{At: 120, Kind: domain.KindHeartbeatReceived, Node: "B", Peer: "A", Round: 1},
 		{At: 215, Kind: domain.KindNodeCrashed, Node: "B"},
 	} {
-		if err := r.Record(ev); err != nil {
+		if _, err := r.Record(ev); err != nil {
 			t.Fatalf("Record(%+v): %v", ev, err)
 		}
 	}
@@ -167,7 +167,7 @@ func (w failWriter) Write([]byte) (int, error) { return 0, w.err }
 
 func TestWriteJSONLReportsEncoderFailures(t *testing.T) {
 	r := NewRecorder()
-	if err := r.Record(event(domain.KindHeartbeatSent, 1)); err != nil {
+	if _, err := r.Record(event(domain.KindHeartbeatSent, 1)); err != nil {
 		t.Fatal(err)
 	}
 	boom := errors.New("write end closed")

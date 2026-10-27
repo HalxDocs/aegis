@@ -15,15 +15,15 @@ type stubRecorder struct {
 	err    error
 }
 
-func (r *stubRecorder) Record(ev domain.Event) error {
+func (r *stubRecorder) Record(ev domain.Event) (domain.Ref, error) {
 	if r.err != nil {
-		return r.err
+		return 0, r.err
 	}
 	if err := ev.Validate(); err != nil {
 		r.bad = append(r.bad, err)
 	}
 	r.events = append(r.events, ev)
-	return nil
+	return domain.Ref(len(r.events)), nil
 }
 
 func (r *stubRecorder) ofKind(kind domain.Kind) []domain.Event {

@@ -35,7 +35,7 @@ var (
 // declared here, at the consumer, so this package never learns how events are
 // stored.
 type EventRecorder interface {
-	Record(domain.Event) error
+	Record(domain.Event) (domain.Ref, error)
 }
 
 // FaultSink receives errors raised inside scheduled work, where there is no
@@ -153,7 +153,7 @@ func (d *Detector) HeartbeatReceived(at domain.Tick, from, to domain.NodeID, rou
 	if to != d.observer {
 		return nil
 	}
-	if err := d.rec.Record(domain.Event{
+	if _, err := d.rec.Record(domain.Event{
 		At:    at,
 		Kind:  domain.KindHeartbeatReceived,
 		Node:  from,
@@ -172,7 +172,7 @@ func (d *Detector) HeartbeatReceived(at domain.Tick, from, to domain.NodeID, rou
 		return fmt.Errorf("detector %s: %w", d.observer, err)
 	}
 	if m.obs.Belief == domain.BeliefSuspected && next.Belief == domain.BeliefHealthy {
-		if err := d.rec.Record(domain.Event{
+		if _, err := d.rec.Record(domain.Event{
 			At:   at,
 			Kind: domain.KindSuspicionCleared,
 			Node: from,

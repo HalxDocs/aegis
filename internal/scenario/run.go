@@ -72,7 +72,7 @@ func Run(spec Spec, seed uint64) (Result, error) {
 	// Everything is configured, so the history can open. Nothing above this
 	// point writes an event, which keeps a configuration error from leaving a
 	// half-written log behind.
-	if err := log.Record(domain.Event{At: engine.Now(), Kind: domain.KindScenarioStarted, Scenario: spec.Name}); err != nil {
+	if _, err := log.Record(domain.Event{At: engine.Now(), Kind: domain.KindScenarioStarted, Scenario: spec.Name}); err != nil {
 		return Result{}, fmt.Errorf("scenario %s: %w", spec.Name, err)
 	}
 	if err := engine.Start(); err != nil {
@@ -86,7 +86,7 @@ func Run(spec Spec, seed uint64) (Result, error) {
 	if err := engine.Run(spec.Horizon); err != nil {
 		return Result{}, fmt.Errorf("scenario %s: %w", spec.Name, err)
 	}
-	if err := log.Record(domain.Event{At: engine.Now(), Kind: domain.KindScenarioFinished, Scenario: spec.Name}); err != nil {
+	if _, err := log.Record(domain.Event{At: engine.Now(), Kind: domain.KindScenarioFinished, Scenario: spec.Name}); err != nil {
 		return Result{}, fmt.Errorf("scenario %s: %w", spec.Name, err)
 	}
 

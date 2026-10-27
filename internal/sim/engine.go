@@ -28,8 +28,11 @@ var (
 // EventRecorder is the append-only history the simulator writes to. It is
 // declared here, at the consumer, so this package depends on the behaviour it
 // needs rather than on a concrete recorder implementation.
+//
+// Record returns the reference the recorder assigned, because a later event may
+// need to cite the one just written.
 type EventRecorder interface {
-	Record(domain.Event) error
+	Record(domain.Event) (domain.Ref, error)
 }
 
 // Receiver is told about messages that actually arrived. A detector is the only
@@ -174,7 +177,7 @@ func (e *Engine) Start() error {
 	return nil
 }
 
-func (e *Engine) record(ev domain.Event) error { return e.rec.Record(ev) }
+func (e *Engine) record(ev domain.Event) (domain.Ref, error) { return e.rec.Record(ev) }
 
 // Fail records err as the run's first fault. Components that schedule their own
 // work report failures here, because a scheduled callback has no caller to

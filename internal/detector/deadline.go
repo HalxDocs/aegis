@@ -81,7 +81,7 @@ func (d *Detector) evaluate(target domain.NodeID, epoch uint64, at domain.Tick) 
 	if err != nil {
 		return fmt.Errorf("detector %s: %w", d.observer, err)
 	}
-	if err := d.rec.Record(domain.Event{
+	if _, err := d.rec.Record(domain.Event{
 		At:     at,
 		Kind:   domain.KindSuspicionRaised,
 		Node:   target,

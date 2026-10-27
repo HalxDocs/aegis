@@ -77,7 +77,7 @@ func (n *node) start(at domain.Tick) error {
 	if n.state != domain.StateRunning {
 		return fmt.Errorf("node %s: cannot start while %s", n.id, n.state)
 	}
-	if err := n.eng.record(domain.Event{At: at, Kind: domain.KindNodeStarted, Node: n.id}); err != nil {
+	if _, err := n.eng.record(domain.Event{At: at, Kind: domain.KindNodeStarted, Node: n.id}); err != nil {
 		return fmt.Errorf("node %s: record start: %w", n.id, err)
 	}
 	if n.every == 0 {
@@ -131,7 +131,7 @@ func (n *node) crash(at domain.Tick) error {
 	if n.timer != nil {
 		n.timer.Cancel()
 	}
-	if err := n.eng.record(domain.Event{At: at, Kind: domain.KindNodeCrashed, Node: n.id}); err != nil {
+	if _, err := n.eng.record(domain.Event{At: at, Kind: domain.KindNodeCrashed, Node: n.id}); err != nil {
 		return fmt.Errorf("node %s: record crash: %w", n.id, err)
 	}
 	return nil

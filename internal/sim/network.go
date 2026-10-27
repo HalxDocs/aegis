@@ -199,7 +199,7 @@ func (n *network) send(at domain.Tick, msg Message) error {
 			return fmt.Errorf("schedule delivery of %s: %w", link, err)
 		}
 	}
-	if err := n.rec.Record(domain.Event{
+	if _, err := n.rec.Record(domain.Event{
 		At:    at,
 		Kind:  domain.KindHeartbeatSent,
 		Node:  msg.From,
@@ -229,7 +229,7 @@ func (n *network) arrive(at domain.Tick, msg Message, lost bool) {
 
 // recordDrop writes the outcome of a message that never reached its receiver.
 func (n *network) recordDrop(at domain.Tick, msg Message, reason string) error {
-	return n.rec.Record(domain.Event{
+	_, err := n.rec.Record(domain.Event{
 		At:     at,
 		Kind:   domain.KindMessageDropped,
 		Node:   msg.From,
@@ -237,4 +237,5 @@ func (n *network) recordDrop(at domain.Tick, msg Message, reason string) error {
 		Round:  msg.Round,
 		Reason: reason,
 	})
+	return err
 }
