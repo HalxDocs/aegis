@@ -92,3 +92,42 @@ func TestEveryCanonicalRunFormsOneRootedGraph(t *testing.T) {
 		}
 	}
 }
+
+// TestNoBeliefIsDescendedFromGroundTruth is the milestone's claim. Truth is
+// recorded, and it is real, and nothing an observer concluded can be traced
+// back to it — because the only thing an observer ever received was a message.
+func TestNoBeliefIsDescendedFromGroundTruth(t *testing.T) {
+	res := mustRun(t, NodeCrash(), 1)
+	idx := causalIndex(t, res)
+
+	crash := refOfEvent(t, res, domain.KindNodeCrashed)
+	if descendants, err := idx.Descendants(crash); err != nil {
+		t.Fatal(err)
+	} else if len(descendants) != 0 {
+		t.Fatalf("the crash explains %d events (%v); ground truth must be causally inert", len(descendants), descendants)
+	}
+
+	for _, ref := range append(refsOfKind(t, res, domain.KindSuspicionRaised), refsOfKind(t, res, domain.KindSuspicionCleared)...) {
+		ancestors, err := idx.Ancestors(ref)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, cause := range ancestors {
+			if cause == crash {
+				t.Fatalf("event %s is descended from the crash, which no observer saw", ref)
+			}
+		}
+	}
+
+	// The suspicion cites the last receipt, and the receipt cites the send.
+	for _, ref := range refsOfKind(t, res, domain.KindSuspicionRaised) {
+		ev, _ := idx.Event(ref)
+		if len(ev.Causes) != 1 {
+			t.Fatalf("suspicion %s cites %v, want exactly the evidence that set its deadline", ref, ev.Causes)
+		}
+		cause, ok := idx.Event(ev.Causes[0])
+		if !ok || cause.Kind != domain.KindHeartbeatReceived {
+			t.Fatalf("suspicion %s cites %+v, want a receipt", ref, cause)
+		}
+	}
+}
