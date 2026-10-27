@@ -23,6 +23,9 @@ var (
 
 	// ErrAlreadyStarted is returned when a run is started twice.
 	ErrAlreadyStarted = errors.New("simulator has already started")
+
+	// ErrAlreadyOpen is returned when a history is opened twice.
+	ErrAlreadyOpen = errors.New("history has already been opened")
 )
 
 // EventRecorder is the append-only history the simulator writes to. It is
@@ -64,6 +67,11 @@ type Engine struct {
 	receivers []Receiver
 	err       error
 	started   bool
+
+	// root is the reference of the opening event. Every exogenous change — a
+	// crash, a cut — cites it, so a walk backwards always ends at the scenario
+	// rather than at a reference that resolves to nothing.
+	root domain.Ref
 }
 
 // Engine is usable anywhere a clock or a scheduler is expected. The detector
@@ -125,6 +133,55 @@ func (e *Engine) AddReceiver(r Receiver) error {
 		return ErrNoReceiver
 	}
 	e.receivers = append(e.receivers, r)
+	return nil
+}
+
+// Open records the opening event and keeps its reference as the root of the
+// causal graph.
+//
+// It must be called before Start, because the first node_started already cites
+// it, and after all configuration, because a rejected scenario should not leave
+// a history behind.
+func (e *Engine) Open(scenario string) error {
+	if e.started {
+		return ErrAlreadyStarted
+	}
+	if e.root != 0 {
+		return ErrAlreadyOpen
+	}
+	ref, err := e.record(domain.Event{
+		At:       e.sched.now,
+		Kind:     domain.KindScenarioStarted,
+		Scenario: scenario,
+	})
+	if err != nil {
+		return fmt.Errorf("open history: %w", err)
+	}
+	e.root = ref
+	return nil
+}
+
+// Root returns the reference of the opening event, or zero if the history has
+// not been opened yet.
+func (e *Engine) Root() domain.Ref { return e.root }
+
+// Close records the closing event, citing the opening event.
+//
+// The run ends because the scenario that opened it reached its horizon: that is
+// the only honest cause available, and it keeps the whole history reachable from
+// a single root.
+func (e *Engine) Close(scenario string) error {
+	if e.root == 0 {
+		return ErrNotStarted
+	}
+	if _, err := e.record(domain.Event{
+		At:       e.sched.now,
+		Kind:     domain.KindScenarioFinished,
+		Scenario: scenario,
+		Causes:   []domain.Ref{e.root},
+	}); err != nil {
+		return fmt.Errorf("close history: %w", err)
+	}
 	return nil
 }
 
