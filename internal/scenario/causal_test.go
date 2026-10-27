@@ -170,3 +170,34 @@ func TestTheRepairExplainsNothing(t *testing.T) {
 		t.Fatalf("the recovery is explained by an event at %d, want the arrival at 920 ms", last.At)
 	}
 }
+
+// TestALostMessageHasTwoReasons is the shape a branch gives: the send that put
+// the message on the wire and the outage that swallowed it.
+func TestALostMessageHasTwoReasons(t *testing.T) {
+	res := mustRun(t, OneWayPartition(), 1)
+	idx := causalIndex(t, res)
+
+	drops := refsOfKind(t, res, domain.KindMessageDropped)
+	if len(drops) != 6 {
+		t.Fatalf("drops = %d, want the six rounds sent into the cut", len(drops))
+	}
+	ev, _ := idx.Event(drops[0])
+	if len(ev.Causes) != 2 {
+		t.Fatalf("the first drop cites %v, want two causes", ev.Causes)
+	}
+	cut := refOfEvent(t, res, domain.KindLinkPartitioned)
+	if ev.Causes[0] != cut {
+		t.Fatalf("the first drop cites %v first, want the cut %s", ev.Causes, cut)
+	}
+	sender, _ := idx.Event(ev.Causes[1])
+	if sender.Kind != domain.KindHeartbeatSent {
+		t.Fatalf("the second cause is %s, want the send", sender.Kind)
+	}
+	ancestors, err := idx.Ancestors(drops[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(ancestors) != 4 {
+		t.Fatalf("the drop has %d ancestors (%v), want the cut, the send, the node and the scenario", len(ancestors), ancestors)
+	}
+}
