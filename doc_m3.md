@@ -142,7 +142,7 @@ Two consequences are worth stating plainly, because both are claims and both are
 | `internal/detector` | a monitor remembers the reference that armed its deadline; suspicion and recovery cite it |
 | `internal/causal` | new: validates a whole history as one rooted, backwards-pointing graph and explains any event |
 | `internal/scenario` | `Result.Causal()`, the runner opens the history before building observers, and the fixture is regenerated |
-| `cmd/aegis` | `explain -ref N [-depth N]` |
+| `cmd/aegis` | `explain -ref N [-depth N] [-log path]` |
 | `Makefile` | `make explain` |
 
 The one thing that did not change is the timeline. Adding a field to every line changes the bytes of the fixture and
@@ -251,12 +251,26 @@ reasons were sufficient, and the same chain would be produced whether or not the
 
 ```
 aegis explain -ref <seq> [-scenario node-crash|one-way-partition] [-seed N] [-depth N]
+aegis explain -ref <seq> -log <path-to-jsonl>
 ```
 
 `-ref` is required and is a sequence number, not a timestamp: the log is numbered, and the number is the identity the
 causes cite. `-depth` limits how far back to walk; a branch that is cut off prints `...` rather than stopping
 silently. `-seed` matters only for scenarios with random loss, since a different draw is a different history and a
 different numbering.
+
+`-log` explains a history from disk instead of running one, and the two sources are mutually exclusive. This is where
+the graph's rules earn their keep, because a file can be edited after it was written. A refused log is refused as a
+file, with the rule that broke named:
+
+```
+$ aegis explain -log edited.jsonl -ref 61
+aegis: log edited.jsonl is not a causal history: cause is not recorded before its effect: suspicion_cleared cites 63
+```
+
+The reader cannot catch this on its own: the edited line is still dense, well-formed JSONL, and the damage only
+appears when the references are resolved. An unreadable file is reported separately, as `not a readable history`,
+so a truncated artifact and a rewired graph do not share one message.
 
 Reading tips that hold for every chain:
 
@@ -272,14 +286,14 @@ Reading tips that hold for every chain:
 ```
 gofmt -l .          # empty
 go vet ./...        # empty
-go test ./...       # 7 packages, 223 test functions
+go test ./...       # 7 packages, 228 test functions
 go test -race ./... # clean
 make replay         # node-crash: identical / one-way-partition: identical
 make check          # fmt, vet, build, test, race
 ```
 
 Coverage is 93.1% overall: `causal` 96.4, `observability` 100, `sim` 94.9, `domain` 93.7, `detector` 91.7,
-`scenario` 89.4, `cmd` 87.8. The project is 9,037 lines of Go, 5,843 of them tests.
+`scenario` 89.4, `cmd` 88.7. The project is 9,242 lines of Go, 5,985 of them tests.
 
 What the tests establish, in the order the claims are made:
 
@@ -292,7 +306,9 @@ What the tests establish, in the order the claims are made:
   reader and refused by the index with `ErrCauseOrder`, and a reference to an event that does not exist
   is refused with `ErrDanglingCause`;
 - the CLI renders the crash run's suspicion chain, the partition run's recovery, and a two-parent drop, and the
-  first of those contains no crash.
+  first of those contains no crash.;
+- the CLI reads a history from disk and explains it exactly as it explains a live run, and refuses one that a hand
+  edit gave a future cause or a missing one, naming the file and the rule while printing no chain at all.
 
 The fixture was regenerated once, in the commit that first wrote a cause. The timeline tests were not touched, and
 the 16-event canonical run still has the same 16 events in the same order at the same instants.

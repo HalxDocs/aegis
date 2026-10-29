@@ -118,6 +118,8 @@ go run ./cmd/aegis run --scenario node-crash --format jsonl      # canonical mac
 go run ./cmd/aegis run --scenario one-way-partition --format table
 go run ./cmd/aegis run --scenario node-crash --seed 7            # seed is an input, not a global
 go run ./cmd/aegis explain -scenario one-way-partition -ref 61   # the reasons behind one event
+go run ./cmd/aegis run --format jsonl > run.jsonl               # also: explain a log from disk
+go run ./cmd/aegis explain -log run.jsonl -ref 14
 ```
 
 The JSONL log is the canonical artifact: one event per line, virtual timestamps only, sequence numbers assigned by
