@@ -259,9 +259,12 @@ causes cite. `-depth` limits how far back to walk; a branch that is cut off prin
 silently. `-seed` matters only for scenarios with random loss, since a different draw is a different history and a
 different numbering.
 
-`-log` explains a history from disk instead of running one, and the two sources are mutually exclusive. This is where
-the graph's rules earn their keep, because a file can be edited after it was written. A refused log is refused as a
-file, with the rule that broke named:
+`-log` explains a history from disk instead of running one. `-scenario` and `-seed` are refused with it rather
+than ignored: a seed only changes how a run draws its random decisions, so accepting one beside a recorded history
+would let a reader believe it had done something.
+
+Reading a file is also where the graph's rules earn their keep, because a file can be edited after it was written.
+A refused log is refused as a file, with the rule that broke named:
 
 ```
 $ aegis explain -log edited.jsonl -ref 61
@@ -293,7 +296,7 @@ make check          # fmt, vet, build, test, race
 ```
 
 Coverage is 93.1% overall: `causal` 96.4, `observability` 100, `sim` 94.9, `domain` 93.7, `detector` 91.7,
-`scenario` 89.4, `cmd` 88.7. The project is 9,242 lines of Go, 5,985 of them tests.
+`scenario` 89.4, `cmd` 88.8. The project is 9,292 lines of Go, 6,025 of them tests.
 
 What the tests establish, in the order the claims are made:
 
