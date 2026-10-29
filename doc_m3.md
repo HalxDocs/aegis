@@ -272,14 +272,14 @@ Reading tips that hold for every chain:
 ```
 gofmt -l .          # empty
 go vet ./...        # empty
-go test ./...       # 7 packages, 220 test functions
+go test ./...       # 7 packages, 223 test functions
 go test -race ./... # clean
 make replay         # node-crash: identical / one-way-partition: identical
 make check          # fmt, vet, build, test, race
 ```
 
 Coverage is 93.1% overall: `causal` 96.4, `observability` 100, `sim` 94.9, `domain` 93.7, `detector` 91.7,
-`scenario` 89.4, `cmd` 87.8. The project is 8,902 lines of Go, 5,708 of them tests.
+`scenario` 89.4, `cmd` 87.8. The project is 9,037 lines of Go, 5,843 of them tests.
 
 What the tests establish, in the order the claims are made:
 
@@ -288,6 +288,9 @@ What the tests establish, in the order the claims are made:
 - every suspicion of a dead node cites a receipt, and that receipt cites a send;
 - every drop inside the cut cites the cut and the send, in that order;
 - the committed fixture, read back from disk, explains event 61 as the receipt at 920 ms;
+- the same fixture, corrupted in a temporary copy so event 61 cites a later event, is accepted by the
+  reader and refused by the index with `ErrCauseOrder`, and a reference to an event that does not exist
+  is refused with `ErrDanglingCause`;
 - the CLI renders the crash run's suspicion chain, the partition run's recovery, and a two-parent drop, and the
   first of those contains no crash.
 
