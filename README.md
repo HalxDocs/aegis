@@ -93,7 +93,8 @@ recovery loop, and a graph that claimed to explain an absence would be worse tha
 ## Releases
 
 Each milestone is tagged, and its release note is written for people reading the code: what the run shows, what moved
-in the API, the one decision worth arguing about, and what is still not modelled.
+in the API, the one decision worth arguing about, and what is still not modelled. A guard in `make check` compares the
+table below with the tags that exist, so a row claiming a release nobody published fails the build.
 
 | release | what it covers |
 | --- | --- |
