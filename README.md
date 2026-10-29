@@ -92,8 +92,9 @@ recovery loop, and a graph that claimed to explain an absence would be worse tha
 
 ## Releases
 
-Each milestone is cut as a tag. The release notes are written for people reading the code: what the run shows, what
-moved in the API, the one decision worth arguing about, and what is still not modelled.
+A milestone is tagged once it has a written release note; until then it is recorded in its design document and the
+row below says so. The notes are aimed at people reading the code: what the run shows, what moved in the API, the one
+decision worth arguing about, and what is still not modelled.
 
 | release | what it covers |
 | --- | --- |
