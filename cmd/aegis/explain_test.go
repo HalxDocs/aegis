@@ -266,10 +266,50 @@ func TestExplainRefusesALogItCannotParse(t *testing.T) {
 	}
 }
 
-func TestExplainRefusesLogAndScenarioTogether(t *testing.T) {
+// TestExplainRefusesFlagsThatCannotApplyToListedLog keeps -log honest about what it
+// uses. A seed only changes how a run draws its random decisions, so passing one
+// alongside a recorded history is a belief that it did something.
+func TestExplainRefusesFlagsThatCannotApplyToListedLog(t *testing.T) {
 	path := writeLog(t, "node-crash.jsonl", loggedRun(t, "node-crash"), nil)
-	if _, err := runCLI(t, "explain", "-log", path, "-scenario", "node-crash", "-ref", "14"); err == nil {
-		t.Fatal("explain accepted two sources for one explanation")
+
+	cases := map[string]struct {
+		args []string
+		want []string
+	}{
+		"two sources": {
+			args: []string{"explain", "-log", path, "-scenario", "node-crash", "-ref", "14"},
+			want: []string{"-scenario"},
+		},
+		"seed": {
+			args: []string{"explain", "-log", path, "-seed", "7", "-ref", "14"},
+			want: []string{"-seed"},
+		},
+		"both": {
+			args: []string{"explain", "-log", path, "-scenario", "node-crash", "-seed", "7", "-ref", "14"},
+			want: []string{"-scenario and -seed"},
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			out, err := runCLI(t, tc.args...)
+			if err == nil {
+				t.Fatalf("%v was accepted", tc.args)
+			}
+			if out != "" {
+				t.Fatalf("a rejected invocation still printed a chain:\n%s", out)
+			}
+			for _, want := range tc.want {
+				if !strings.Contains(err.Error(), want) {
+					t.Fatalf("error = %q, want it to name %q", err, want)
+				}
+			}
+		})
+	}
+
+	// The counterpart: -seed still applies when a scenario is run, so the
+	// rejection above is about the source, not about the flag.
+	if _, err := runCLI(t, "explain", "-scenario", "node-crash", "-seed", "7", "-ref", "14"); err != nil {
+		t.Fatalf("explain with a seed and a scenario: %v", err)
 	}
 }
 

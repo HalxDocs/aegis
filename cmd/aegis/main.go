@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 
 	"github.com/HalxDocs/aegis/internal/causal"
 	"github.com/HalxDocs/aegis/internal/domain"
@@ -32,6 +33,8 @@ explain flags:
   -scenario string  scenario to run (default "node-crash")
   -seed uint        seed for deterministic decisions (default 0)
   -depth int        how far back to walk; 0 prints the whole chain
+
+-log explains a recorded history, so -scenario and -seed do not apply with it.
 `
 
 func main() {
@@ -122,14 +125,21 @@ func runExplain(args []string, stdout, stderr io.Writer) error {
 		return fmt.Errorf("depth %d is negative", *depth)
 	}
 	if *path != "" {
-		scenarioSet := false
+		// A flag that only means something while a scenario runs is not silently
+		// ignored: a reader who passed it believed it did something, and being
+		// told otherwise is cheaper than a wrong conclusion about the chain.
+		var inapplicable []string
 		flags.Visit(func(f *flag.Flag) {
-			if f.Name == "scenario" {
-				scenarioSet = true
+			switch f.Name {
+			case "scenario":
+				inapplicable = append(inapplicable, "-scenario")
+			case "seed":
+				inapplicable = append(inapplicable, "-seed")
 			}
 		})
-		if scenarioSet {
-			return errors.New("explain takes -log or -scenario, not both")
+		if len(inapplicable) > 0 {
+			return fmt.Errorf("explain -log reads a recorded history, so %s cannot apply",
+				strings.Join(inapplicable, " and "))
 		}
 	}
 
