@@ -68,6 +68,53 @@ func TestExplainCanBeLimitedToAFewSteps(t *testing.T) {
 	}
 }
 
+// TestExplainMarksEveryTruncatedBranch pins the example in doc_m3.md: depth is
+// counted per branch, so a drop that cites two reasons shows two markers and
+// hides two different subtrees.
+func TestExplainMarksEveryTruncatedBranch(t *testing.T) {
+	out, err := runCLI(t, "explain", "-scenario", "one-way-partition", "-ref", "34", "-depth", "1")
+	if err != nil {
+		t.Fatalf("explain: %v", err)
+	}
+	lines := strings.Split(strings.TrimSpace(out), "\n")
+	want := []string{
+		"34  520ms  message_dropped  B->A round 5 (partition)",
+		"<- 17  300ms  link_partitioned  B->A path cut (one way)",
+		"        ...",
+		"<- 31  500ms  heartbeat_sent  B->A round 5",
+		"        ...",
+	}
+	if len(lines) != len(want) {
+		t.Fatalf("lines = %d, want %d:\n%s", len(lines), len(want), out)
+	}
+	for i := range want {
+		if lines[i] != want[i] {
+			t.Fatalf("line %d = %q, want %q", i, lines[i], want[i])
+		}
+	}
+}
+
+// TestExplainDoesNotMarkAChainThatFits is the other half of that contract: no
+// marker means the chain ended, so the deepest step must print in full.
+func TestExplainDoesNotMarkAChainThatFits(t *testing.T) {
+	full, err := runCLI(t, "explain", "-scenario", "node-crash", "-ref", "14")
+	if err != nil {
+		t.Fatalf("explain: %v", err)
+	}
+	for _, depth := range []string{"5", "6"} {
+		out, err := runCLI(t, "explain", "-scenario", "node-crash", "-ref", "14", "-depth", depth)
+		if err != nil {
+			t.Fatalf("explain -depth %s: %v", depth, err)
+		}
+		if out != full {
+			t.Fatalf("-depth %s changed a chain that fits:\n%s", depth, out)
+		}
+		if strings.Contains(out, "...") {
+			t.Fatalf("-depth %s marked a complete chain:\n%s", depth, out)
+		}
+	}
+}
+
 func TestExplainRejectsAReferenceThatNamesNothing(t *testing.T) {
 	if _, err := runCLI(t, "explain", "-scenario", "node-crash", "-ref", "99"); err == nil {
 		t.Fatal("explaining an event that does not exist was accepted")
