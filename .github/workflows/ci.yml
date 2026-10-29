@@ -23,6 +23,10 @@ jobs:
           cache: true
       - name: Format, vet, build, test and race
         run: make check
+      # Verbose on purpose: a skip here is a silent hole, and only -v shows the
+      # difference between the guard passing and the guard standing down.
+      - name: Release table must match the tags
+        run: go test ./internal/scenario -run TestReleaseTableMatchesTheTags -v
       - name: Replay must be byte identical
         run: make replay
       - name: Coverage summary
