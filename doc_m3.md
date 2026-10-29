@@ -305,8 +305,9 @@ Reading tips that hold for every chain:
 
 - **Read upwards.** The top line is the event; everything below it is a reason for the line above, indented under it.
 - **A branch is a conjunction.** Two causes at the same level both contributed; neither is the "real" one.
-- **The bottom of every chain is the scenario.** An event that stops earlier than that is a defect, and the index
-  refuses it.
+- **A complete chain ends at the scenario.** The root cites nothing and every other event cites at least one cause,
+  both guaranteed by the index, so an untruncated branch that stops anywhere else is a defect rather than a finding.
+  A branch cut by `-depth` ends at `...` instead; only a branch that was not cut has to reach the scenario.
 - **A missing event is information.** If the crash is not in a suspicion's ancestry, that is not a hole in the log:
   it is the statement that the crash never reached the observer.
 
