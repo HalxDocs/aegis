@@ -12,7 +12,11 @@ jobs:
   check:
     runs-on: ubuntu-latest
     steps:
+      # Full history and tags: the release-table guard compares README with the
+      # tags that exist, and a shallow clone has none.
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
