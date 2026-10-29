@@ -272,14 +272,14 @@ Reading tips that hold for every chain:
 ```
 gofmt -l .          # empty
 go vet ./...        # empty
-go test ./...       # 7 packages, 217 test functions
+go test ./...       # 7 packages, 220 test functions
 go test -race ./... # clean
 make replay         # node-crash: identical / one-way-partition: identical
 make check          # fmt, vet, build, test, race
 ```
 
 Coverage is 93.1% overall: `causal` 96.4, `observability` 100, `sim` 94.9, `domain` 93.7, `detector` 91.7,
-`scenario` 89.4, `cmd` 87.8. The project is 8,809 lines of Go, 5,615 of them tests.
+`scenario` 89.4, `cmd` 87.8. The project is 8,902 lines of Go, 5,708 of them tests.
 
 What the tests establish, in the order the claims are made:
 
