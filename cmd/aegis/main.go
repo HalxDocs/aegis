@@ -13,6 +13,7 @@ import (
 	"io"
 	"os"
 
+	"github.com/HalxDocs/aegis/internal/causal"
 	"github.com/HalxDocs/aegis/internal/domain"
 	"github.com/HalxDocs/aegis/internal/scenario"
 )
@@ -27,6 +28,7 @@ run flags:
 
 explain flags:
   -ref uint         sequence number of the event to explain (required)
+  -log string       a JSONL history to read instead of running a scenario
   -scenario string  scenario to run (default "node-crash")
   -seed uint        seed for deterministic decisions (default 0)
   -depth int        how far back to walk; 0 prints the whole chain
@@ -103,6 +105,7 @@ func runExplain(args []string, stdout, stderr io.Writer) error {
 	seed := flags.Uint64("seed", 0, "seed for deterministic decisions")
 	ref := flags.Uint64("ref", 0, "sequence number of the event to explain")
 	depth := flags.Int("depth", 0, "how far back to walk; 0 prints the whole chain")
+	path := flags.String("log", "", "a JSONL history to read instead of running a scenario")
 	if err := flags.Parse(args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
 			return nil
@@ -118,24 +121,56 @@ func runExplain(args []string, stdout, stderr io.Writer) error {
 	if *depth < 0 {
 		return fmt.Errorf("depth %d is negative", *depth)
 	}
+	if *path != "" {
+		scenarioSet := false
+		flags.Visit(func(f *flag.Flag) {
+			if f.Name == "scenario" {
+				scenarioSet = true
+			}
+		})
+		if scenarioSet {
+			return errors.New("explain takes -log or -scenario, not both")
+		}
+	}
 
-	spec, err := lookup(*name)
+	index, err := explainIndex(*path, *name, *seed)
 	if err != nil {
 		return err
-	}
-	result, err := scenario.Run(spec, *seed)
-	if err != nil {
-		return err
-	}
-	index, err := result.Causal()
-	if err != nil {
-		return fmt.Errorf("scenario %s: %w", *name, err)
 	}
 	exp, err := index.Explain(domain.Ref(*ref))
 	if err != nil {
-		return fmt.Errorf("scenario %s: %w", *name, err)
+		return fmt.Errorf("%s: %w", source(*path, *name), err)
 	}
 	return writeExplanation(stdout, exp, *depth)
+}
+
+// explainIndex returns the graph to explain from: either a history read from
+// disk or the log of a scenario run now.
+func explainIndex(path, name string, seed uint64) (*causal.Index, error) {
+	if path != "" {
+		return loadHistory(path)
+	}
+	spec, err := lookup(name)
+	if err != nil {
+		return nil, err
+	}
+	result, err := scenario.Run(spec, seed)
+	if err != nil {
+		return nil, err
+	}
+	index, err := result.Causal()
+	if err != nil {
+		return nil, fmt.Errorf("scenario %s: %w", name, err)
+	}
+	return index, nil
+}
+
+// source names where the history came from, so an error says which one.
+func source(path, name string) string {
+	if path != "" {
+		return "log " + path
+	}
+	return "scenario " + name
 }
 
 // lookup keeps the set of runnable scenarios explicit. Reading scenarios from
