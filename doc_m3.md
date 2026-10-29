@@ -275,6 +275,32 @@ The reader cannot catch this on its own: the edited line is still dense, well-fo
 appears when the references are resolved. An unreadable file is reported separately, as `not a readable history`,
 so a truncated artifact and a rewired graph do not share one message.
 
+### Depth
+
+`-depth` counts steps below the event, and the event itself is level zero. `-depth 1` prints the event and its direct
+reasons, `-depth 2` their reasons as well, and the default of zero prints the whole chain.
+
+The marker is per branch, not per chain. Each reason that still had something below it gets its own `...`, indented
+where its next cause would have appeared, so a drop with two parents cut at depth one shows two markers and hides
+two different branches:
+
+```
+$ aegis explain -log run.jsonl -ref 34 -depth 1
+34  520ms  message_dropped  B->A round 5 (partition)
+<- 17  300ms  link_partitioned  B->A path cut (one way)
+        ...
+<- 31  500ms  heartbeat_sent  B->A round 5
+        ...
+```
+
+A chain that fits inside the limit prints no marker at all. Its absence therefore means there was nothing further to
+show, not that something was dropped: over the node-crash suspicion, `-depth 5` and `-depth 6` print the same six
+lines, the entire chain, because the deepest event is five steps below the suspicion.
+
+Reading a file changes none of this. Depth is applied while rendering, after the graph has been built over every
+event on disk, so a short view of a long file is still a validated view — an event corrupted far from the printed
+branch refuses the whole command rather than staying out of sight.
+
 Reading tips that hold for every chain:
 
 - **Read upwards.** The top line is the event; everything below it is a reason for the line above, indented under it.
@@ -289,14 +315,14 @@ Reading tips that hold for every chain:
 ```
 gofmt -l .          # empty
 go vet ./...        # empty
-go test ./...       # 7 packages, 228 test functions
+go test ./...       # 7 packages, 230 test functions
 go test -race ./... # clean
 make replay         # node-crash: identical / one-way-partition: identical
 make check          # fmt, vet, build, test, race
 ```
 
 Coverage is 93.1% overall: `causal` 96.4, `observability` 100, `sim` 94.9, `domain` 93.7, `detector` 91.7,
-`scenario` 89.4, `cmd` 88.8. The project is 9,292 lines of Go, 6,025 of them tests.
+`scenario` 89.4, `cmd` 88.8. The project is 9,339 lines of Go, 6,072 of them tests.
 
 What the tests establish, in the order the claims are made:
 
@@ -311,7 +337,8 @@ What the tests establish, in the order the claims are made:
 - the CLI renders the crash run's suspicion chain, the partition run's recovery, and a two-parent drop, and the
   first of those contains no crash.;
 - the CLI reads a history from disk and explains it exactly as it explains a live run, and refuses one that a hand
-  edit gave a future cause or a missing one, naming the file and the rule while printing no chain at all.
+  edit gave a future cause or a missing one, naming the file and the rule while printing no chain at all.;
+- depth truncates each branch where it runs out, and a chain that fits inside the limit prints no marker at all.
 
 The fixture was regenerated once, in the commit that first wrote a cause. The timeline tests were not touched, and
 the 16-event canonical run still has the same 16 events in the same order at the same instants.
