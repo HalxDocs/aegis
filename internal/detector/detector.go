@@ -50,6 +50,17 @@ type FaultSink interface {
 	Fail(error)
 }
 
+// FailureSink is told about every failure report as it is produced, together
+// with the reference of the event that recorded it.
+//
+// It exists so a later stage can act while the run is still going, without the
+// detector ever learning what that stage decides. The detector does not delay
+// a report to ask what will be done with it, and it does not read the answer: it
+// states what it observed and continues watching.
+type FailureSink interface {
+	ReportFailed(domain.FailureReport, domain.Ref) error
+}
+
 // Config configures one observer's detector.
 //
 // Timeout is the silence an observer tolerates before it stops trusting a
@@ -66,6 +77,10 @@ type Config struct {
 	// Root is the reference of the scenario_started event. It is the cause of a
 	// suspicion whose deadline was armed before any message arrived.
 	Root domain.Ref
+
+	// Failures, when set, is told about each report as it is written. It may be
+	// nil: a run that only observes needs no consumer for what it observed.
+	Failures FailureSink
 }
 
 // Detector holds one observer's beliefs about the targets it was told to watch.
@@ -80,6 +95,7 @@ type Detector struct {
 	sched    domain.Scheduler
 	rec      EventRecorder
 	faults   FaultSink
+	failures FailureSink
 
 	monitors map[domain.NodeID]*monitor
 	targets  []domain.NodeID
@@ -117,6 +133,7 @@ func New(cfg Config) (*Detector, error) {
 		sched:    cfg.Scheduler,
 		rec:      cfg.Recorder,
 		faults:   cfg.Faults,
+		failures: cfg.Failures,
 		root:     cfg.Root,
 		monitors: make(map[domain.NodeID]*monitor),
 	}, nil

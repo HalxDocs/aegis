@@ -85,19 +85,29 @@ func (d *Detector) evaluate(target domain.NodeID, epoch uint64, at domain.Tick) 
 	if err != nil {
 		return fmt.Errorf("detector %s: %w", d.observer, err)
 	}
-	if _, err := d.rec.Record(domain.Event{
+	raised, err := d.rec.Record(domain.Event{
 		At:     at,
 		Kind:   domain.KindSuspicionRaised,
 		Node:   target,
 		Peer:   d.observer,
 		Reason: domain.ReasonHeartbeatTimeout,
 		Causes: []domain.Ref{m.evidence},
-	}); err != nil {
+	})
+	if err != nil {
 		return fmt.Errorf("detector %s: record suspicion of %s: %w", d.observer, target, err)
 	}
 
 	m.obs = next
 	m.timer = nil
 	d.reports = append(d.reports, report)
+
+	// The report is handed on after it is written, and with the reference of the
+	// line that holds it. A consumer acting on evidence the history does not
+	// contain would be acting on something no reader could check.
+	if d.failures != nil {
+		if err := d.failures.ReportFailed(report, raised); err != nil {
+			return fmt.Errorf("detector %s: deliver report on %s: %w", d.observer, target, err)
+		}
+	}
 	return nil
 }
