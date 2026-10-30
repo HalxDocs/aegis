@@ -83,6 +83,80 @@ func TestRecoveredCrashClearsTheBeliefOnlyWhenEvidenceArrives(t *testing.T) {
 	}
 }
 
+func TestLoneWitnessRefusesToAct(t *testing.T) {
+	res, err := Run(LoneWitness(), 0)
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if got := res.Truth["B"]; got != domain.StateCrashed {
+		t.Fatalf("B is %s, want crashed: a refusal changed ground truth", got)
+	}
+
+	refused := eventsOf(res, domain.KindRecoveryRefused)
+	if len(refused) != 1 {
+		t.Fatalf("recovery_refused events = %d, want 1", len(refused))
+	}
+	if refused[0].Reason != domain.ReasonInsufficientWitnesses {
+		t.Fatalf("refusal reason = %q, want %q", refused[0].Reason, domain.ReasonInsufficientWitnesses)
+	}
+	if refused[0].At != tickMs(620) {
+		t.Fatalf("refusal at %s, want 620ms", refused[0].At.Duration())
+	}
+	if len(refused[0].Causes) != 1 {
+		t.Fatalf("refusal cites %v, want the one report it declined", refused[0].Causes)
+	}
+	if n := len(eventsOf(res, domain.KindRecoveryStarted)); n != 0 {
+		t.Fatalf("recovery_started events = %d, want 0", n)
+	}
+	if len(res.Actions) != 0 {
+		t.Fatalf("actions = %v, want none", res.Actions)
+	}
+	if len(res.Decisions) != 1 || res.Decisions[0].Granted {
+		t.Fatalf("decisions = %v, want one refusal", res.Decisions)
+	}
+	obs, ok := res.Belief("A", "B")
+	if !ok || obs.Belief != domain.BeliefSuspected {
+		t.Fatalf("A believes %v, want suspected", obs.Belief)
+	}
+}
+
+func TestEvidenceArrivingAfterTheReviewOpensASecondCase(t *testing.T) {
+	// A reports at 570ms and C, with a longer timeout, only at 725ms. The review
+	// at 620ms has to decide without C, and C's report then opens a fresh case
+	// rather than joining a decision that has already been written.
+	spec := RecoveredCrash()
+	spec.Observers = []ObserverSpec{
+		{Observer: "A", Target: "B", Timeout: tickMs(350)},
+		{Observer: "C", Target: "B", Timeout: tickMs(500)},
+	}
+	res, err := Run(spec, 0)
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+
+	refused := eventsOf(res, domain.KindRecoveryRefused)
+	if len(refused) != 2 {
+		t.Fatalf("recovery_refused events = %d, want 2", len(refused))
+	}
+	if refused[0].At != tickMs(620) {
+		t.Fatalf("first refusal at %s, want 620ms", refused[0].At.Duration())
+	}
+	if refused[1].At <= tickMs(725) {
+		t.Fatalf("second refusal at %s, want after C's report at 725ms", refused[1].At.Duration())
+	}
+	if len(res.Decisions) != 2 {
+		t.Fatalf("decisions = %d, want 2", len(res.Decisions))
+	}
+	for i, d := range res.Decisions {
+		if d.Granted {
+			t.Fatalf("decision %d was granted on one witness", i+1)
+		}
+		if d.Reason != domain.ReasonInsufficientWitnesses {
+			t.Fatalf("decision %d reason = %q", i+1, d.Reason)
+		}
+	}
+}
+
 func TestRecoveryIsAbsentUnlessTheScenarioAsksForIt(t *testing.T) {
 	res, err := Run(NodeCrash(), 0)
 	if err != nil {
