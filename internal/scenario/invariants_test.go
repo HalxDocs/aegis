@@ -13,47 +13,54 @@ type messageKey struct {
 	To    domain.NodeID
 }
 
+// TestEverySentMessageHasExactlyOneOutcome covers every world that carries
+// traffic, including the one where a node stops and starts again: a resumed
+// node that repeated a round number would show up here as one message sent
+// twice, which is the mistake the restart deliberately avoids.
 func TestEverySentMessageHasExactlyOneOutcome(t *testing.T) {
-	for seed := uint64(1); seed <= 20; seed++ {
-		res := mustRun(t, lossy(), seed)
+	for _, spec := range []Spec{lossy(), RecoveredCrash(), LoneWitness()} {
+		for seed := uint64(1); seed <= 20; seed++ {
+			res := mustRun(t, spec, seed)
 
-		sent := make(map[messageKey]bool)
-		outcome := make(map[messageKey]domain.Kind)
-		for _, ev := range res.Log.Events() {
-			if ev.Kind != domain.KindHeartbeatSent &&
-				ev.Kind != domain.KindHeartbeatReceived &&
-				ev.Kind != domain.KindMessageDropped {
-				continue
+			sent := make(map[messageKey]bool)
+			outcome := make(map[messageKey]domain.Kind)
+			for _, ev := range res.Log.Events() {
+				if ev.Kind != domain.KindHeartbeatSent &&
+					ev.Kind != domain.KindHeartbeatReceived &&
+					ev.Kind != domain.KindMessageDropped {
+					continue
+				}
+				key := messageKey{Round: ev.Round, From: ev.Node, To: ev.Peer}
+				switch ev.Kind {
+				case domain.KindHeartbeatSent:
+					if sent[key] {
+						t.Fatalf("seed %d: message %+v was sent twice", seed, key)
+					}
+					sent[key] = true
+				default:
+					if !sent[key] {
+						t.Fatalf("seed %d: %s recorded for a message never sent: %+v", seed, ev.Kind, key)
+					}
+					if previous, ok := outcome[key]; ok {
+						t.Fatalf("seed %d: message %+v both %s and %s", seed, key, previous, ev.Kind)
+					}
+					outcome[key] = ev.Kind
+				}
 			}
-			key := messageKey{Round: ev.Round, From: ev.Node, To: ev.Peer}
-			switch ev.Kind {
-			case domain.KindHeartbeatSent:
-				if sent[key] {
-					t.Fatalf("seed %d: message %+v was sent twice", seed, key)
-				}
-				sent[key] = true
-			default:
-				if !sent[key] {
-					t.Fatalf("seed %d: %s recorded for a message never sent: %+v", seed, ev.Kind, key)
-				}
-				if previous, ok := outcome[key]; ok {
-					t.Fatalf("seed %d: message %+v both %s and %s", seed, key, previous, ev.Kind)
-				}
-				outcome[key] = ev.Kind
-			}
-		}
 
-		// A message with no outcome yet is still on the wire. Only the last
-		// round can be, and only one per link, so anything larger means a
-		// message vanished without a record.
-		pending := 0
-		for key := range sent {
-			if _, ok := outcome[key]; !ok {
-				pending++
+			// A message with no outcome yet is still on the wire. Only the last
+			// round can be, and only one per link, so anything larger means a
+			// message vanished without a record.
+			pending := 0
+			for key := range sent {
+				if _, ok := outcome[key]; !ok {
+					pending++
+				}
 			}
-		}
-		if pending > len(res.Spec.Links) {
-			t.Fatalf("seed %d: %d messages are unaccounted for, at most one per link can be in flight", seed, pending)
+			if pending > len(res.Spec.Links) {
+				t.Fatalf("%s seed %d: %d messages are unaccounted for, at most one per link can be in flight",
+					res.Spec.Name, seed, pending)
+			}
 		}
 	}
 }
