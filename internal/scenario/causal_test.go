@@ -60,6 +60,8 @@ func TestEveryCanonicalRunFormsOneRootedGraph(t *testing.T) {
 	}{
 		{"node-crash", NodeCrash(), []uint64{0, 1, 7}},
 		{"one-way-partition", OneWayPartition(), []uint64{0, 1, 7}},
+		{"recovered-crash", RecoveredCrash(), []uint64{0, 1, 7}},
+		{"lone-witness", LoneWitness(), []uint64{0, 1, 7}},
 		{"lossy", lossy(), []uint64{1, 2, 3, 4, 5}},
 	}
 	for _, tc := range cases {
