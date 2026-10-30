@@ -9,8 +9,10 @@ const (
 	// StateRunning means the simulated node is executing and may send work.
 	StateRunning NodeState = "running"
 
-	// StateCrashed means the simulator has stopped the node. It is terminal for
-	// the lifetime of a run; restart is a recovery action, not a state edit.
+	// StateCrashed means the simulator has stopped the node. Nothing in the world
+	// brings it back on its own: only a granted recovery action does, and the
+	// simulator performs the move on that action's behalf rather than editing the
+	// state directly.
 	StateCrashed NodeState = "crashed"
 )
 
@@ -24,11 +26,23 @@ func (s NodeState) Valid() bool {
 
 // CanTransitionTo reports whether the simulator may move from s to next.
 //
-// The only permitted move is running -> crashed. Repeating a crash is rejected
-// as an error rather than ignored: a second crash event means the simulator has
-// lost track of the node, and silently accepting it would hide that.
+// Both directions across the crash are permitted, and repeating either state is
+// not. Repeating a crash is rejected as an error rather than ignored: a second
+// crash event means the simulator has lost track of the node, and silently
+// accepting it would hide that. The same rule forbids restarting a node that is
+// already running, which is how a recovery action applied twice shows up as an
+// error instead of as a harmless duplicate in the history.
+//
+// The state machine cannot tell a restart from any other way of reviving a
+// node, so the authority is elsewhere: only a granted action reaches the
+// simulator's restart path, and nothing else in the system can move a node out
+// of StateCrashed.
 func (s NodeState) CanTransitionTo(next NodeState) bool {
-	return s == StateRunning && next == StateCrashed
+	if s == next {
+		return false
+	}
+	return (s == StateRunning && next == StateCrashed) ||
+		(s == StateCrashed && next == StateRunning)
 }
 
 // TransitionTo validates a move and returns the resulting state. On rejection
