@@ -24,6 +24,17 @@ func TestEventValidateAcceptsEachKind(t *testing.T) {
 		"suspicion cleared": {Kind: domain.KindSuspicionCleared, At: tick(600), Node: "A", Peer: "B"},
 		"link partitioned":  {Kind: domain.KindLinkPartitioned, At: tick(300), Node: "B", Peer: "A"},
 		"link restored":     {Kind: domain.KindLinkRestored, At: tick(900), Node: "B", Peer: "A"},
+		"recovery proposed": {
+			Kind: domain.KindRecoveryProposed, At: tick(575), Node: "B", Action: 1, Causes: []domain.Ref{14, 15},
+		},
+		"recovery refused": {
+			Kind: domain.KindRecoveryRefused, At: tick(870), Node: "B", Action: 1,
+			Reason: domain.ReasonInsufficientWitnesses, Causes: []domain.Ref{14},
+		},
+		"recovery started": {
+			Kind: domain.KindRecoveryStarted, At: tick(625), Node: "B", Action: 1, Causes: []domain.Ref{17},
+		},
+		"node restarted": {Kind: domain.KindNodeRestarted, At: tick(625), Node: "B"},
 	}
 	for name, event := range events {
 		t.Run(name, func(t *testing.T) {
@@ -51,6 +62,25 @@ func TestEventValidateRejectsIncompleteEvents(t *testing.T) {
 		"cut with a round":           {Kind: domain.KindLinkPartitioned, Node: "B", Peer: "A", Round: 1},
 		"cut with a reason":          {Kind: domain.KindLinkRestored, Node: "B", Peer: "A", Reason: domain.ReasonPartition},
 		"invalid node id":            {Kind: domain.KindNodeStarted, Node: "bad node"},
+
+		"proposal without an action": {Kind: domain.KindRecoveryProposed, Node: "B", Causes: []domain.Ref{14}},
+		"proposal without evidence": {
+			Kind: domain.KindRecoveryProposed, Node: "B", Action: 1,
+		},
+		"proposal with a peer": {
+			Kind: domain.KindRecoveryProposed, Node: "B", Peer: "A", Action: 1, Causes: []domain.Ref{14},
+		},
+		"proposal with a reason": {
+			Kind: domain.KindRecoveryProposed, Node: "B", Action: 1, Reason: "because", Causes: []domain.Ref{14},
+		},
+		"refusal without a reason": {
+			Kind: domain.KindRecoveryRefused, Node: "B", Action: 1, Causes: []domain.Ref{14},
+		},
+		"refusal without evidence": {
+			Kind: domain.KindRecoveryRefused, Node: "B", Action: 1, Reason: domain.ReasonInsufficientWitnesses,
+		},
+		"restart of no node":     {Kind: domain.KindNodeRestarted, At: tick(625), Action: 1},
+		"restart with an action": {Kind: domain.KindNodeRestarted, At: tick(625), Node: "B", Action: 1},
 	}
 	for name, event := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -67,6 +97,9 @@ func TestKindValidity(t *testing.T) {
 	}
 	if !domain.KindHeartbeatReceived.Valid() {
 		t.Fatal("declared kind must be valid")
+	}
+	if !domain.KindRecoveryRefused.Valid() {
+		t.Fatal("a refusal is part of the vocabulary: if it cannot be written down, it did not happen")
 	}
 	if got, want := domain.KindNodeCrashed.String(), "node_crashed"; got != want {
 		t.Fatalf("String() = %q, want %q", got, want)
