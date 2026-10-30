@@ -1,0 +1,14 @@
+{"seq":1,"at":0,"kind":"scenario_started","scenario":"lone-witness"}
+{"seq":2,"at":0,"kind":"node_started","node":"A","causes":[1]}
+{"seq":3,"at":0,"kind":"node_started","node":"B","causes":[1]}
+{"seq":4,"at":0,"kind":"node_started","node":"C","causes":[1]}
+{"seq":5,"at":100000000,"kind":"heartbeat_sent","node":"B","peer":"A","round":1,"causes":[3]}
+{"seq":6,"at":100000000,"kind":"heartbeat_sent","node":"B","peer":"C","round":1,"causes":[3]}
+{"seq":7,"at":120000000,"kind":"heartbeat_received","node":"B","peer":"A","round":1,"causes":[5]}
+{"seq":8,"at":200000000,"kind":"heartbeat_sent","node":"B","peer":"A","round":2,"causes":[5]}
+{"seq":9,"at":200000000,"kind":"heartbeat_sent","node":"B","peer":"C","round":2,"causes":[6]}
+{"seq":10,"at":215000000,"kind":"node_crashed","node":"B","causes":[1]}
+{"seq":11,"at":220000000,"kind":"heartbeat_received","node":"B","peer":"A","round":2,"causes":[8]}
+{"seq":12,"at":570000000,"kind":"suspicion_raised","node":"B","peer":"A","reason":"heartbeat_timeout","causes":[11]}
+{"seq":13,"at":620000000,"kind":"recovery_refused","node":"B","reason":"insufficient_witnesses","action":1,"causes":[12]}
+{"seq":14,"at":1200000000,"kind":"scenario_finished","scenario":"lone-witness","causes":[1]}
