@@ -320,21 +320,39 @@ func RecoveredCrash() Spec {
 
 // LoneWitness is the refusal scenario.
 //
-// The world is the same and the crash is the same; only the observers differ.
-// With C removed, A is the single node that ever reports, and the policy wants
-// two. At 620 ms the gate refuses with insufficient_witnesses, B stays down for
-// the rest of the run, and the log ends with a written decision not to act.
+// The crash is the same and the policy is the same; only the world is smaller.
+// With C gone, A is the single node that ever reports, and the policy wants two.
+// At 620 ms the gate refuses with insufficient_witnesses, B stays down for the
+// rest of the run, and the log ends with a written decision not to act.
+//
+// C is removed from the world rather than left in it watching nothing. A receipt
+// is recorded by the observer that accepts it, so traffic to a node nobody
+// watches would appear in the log as a send with no outcome — indistinguishable
+// from a message still on the wire. A scenario about a single piece of evidence
+// must not manufacture evidence nobody keeps.
 //
 // A refusal is the reason this scenario exists. Without it, "two witnesses are
 // required" would be an untested claim, and a single observer's silence would
 // look indistinguishable from a dead node.
 func LoneWitness() Spec {
-	spec := NodeCrash()
-	spec.Name = "lone-witness"
-	spec.Observers = []ObserverSpec{
-		{Observer: "A", Target: "B", Timeout: domain.TickFrom(350 * time.Millisecond)},
+	return Spec{
+		Name: "lone-witness",
+		Nodes: []sim.NodeConfig{
+			{ID: "A"},
+			{
+				ID:             "B",
+				HeartbeatEvery: domain.TickFrom(100 * time.Millisecond),
+				Peers:          []domain.NodeID{"A"},
+			},
+		},
+		Links: []sim.LinkConfig{
+			{From: "B", To: "A", Latency: domain.TickFrom(20 * time.Millisecond)},
+		},
+		Observers: []ObserverSpec{
+			{Observer: "A", Target: "B", Timeout: domain.TickFrom(350 * time.Millisecond)},
+		},
+		Crash:    &CrashSpec{Node: "B", At: domain.TickFrom(215 * time.Millisecond)},
+		Horizon:  domain.TickFrom(1200 * time.Millisecond),
+		Recovery: recoveryPolicy(),
 	}
-	spec.Horizon = domain.TickFrom(1200 * time.Millisecond)
-	spec.Recovery = recoveryPolicy()
-	return spec
 }
