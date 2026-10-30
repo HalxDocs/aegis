@@ -125,5 +125,127 @@ cannot be met, which is exactly the shortcut that makes a single observer's sile
 
 **C4 — Recovery is not belief recovery.**
 B is running again at 720 ms, and A still distrusts it until 840 ms. Can fail by: clearing suspicion when the
-restart happens, which is the tempting shortcut — the node is back, so the belief should be. It would make the log
-say that an observer learned something it was never told.
+restart happens, which is the tempting shortcut — the node is back, so the belief should be.It would make the log say that an observer learned something it was never told.
+
+## 5. The recovery contract
+
+Recovery adds four kinds of event, and each one has exactly one honest cause:
+
+| event | causes | why that is the honest answer |
+| --- | --- | --- |
+| `recovery_proposed` | one `suspicion_raised` per witness | the decision cites what it weighed, one edge per observer, so a reader can check the count against the threshold |
+| `recovery_refused` | the same witnesses | a refusal rests on the same evidence as a grant; its `reason` says what the evidence did not reach |
+| `recovery_started` | the proposal | carrying out a grant is caused by the grant. Nothing is re-decided on the way to the world |
+| `node_restarted` | the start | the world changed because the action was carried out, and the file says so before it happens |
+| `heartbeat_sent`, first round after a restart | `node_restarted` | the resumed chain runs through the reason the node is alive rather than past the crash it survived |
+| `suspicion_cleared` | the receipt that arrived | unchanged from Milestone 3: a belief changes on evidence, never on topology or on the world being fixed |
+
+Two consequences are worth stating, because both are claims and both are tested.
+
+**A decision is written before the world changes.** `recovery_proposed` and `recovery_started` are separate events,
+100 ms apart in the canonical run, and the proposal is in the file before the simulator is asked to act. A reader
+therefore never finds a restart whose reason appears later in the file than the restart itself. The delay is not
+decoration: it is the window in which the decision is reviewable as a decision.
+
+**The restart is the first change in ground truth that has descendants — and that is correct.** Milestone 3's rule
+was that no observer's belief descends from ground truth, because a crash or a cut is never delivered to anybody.
+That rule now needs one qualification, and the qualification is the milestone's own subject. The crash still
+produces nothing: nothing cites it, no belief descends from it. But `node_restarted` is cited by the first
+heartbeat the revived node sends, so A's clearance at 840 ms does have a restart in its ancestry:
+
+```
+$ go run ./cmd/aegis explain -scenario recovered-crash -ref 22 -depth 6
+22  840ms  suspicion_cleared  B trusted again by A
+<- 21  840ms  heartbeat_received  B->A round 3
+    <- 19  820ms  heartbeat_sent  B->A round 3
+        <- 18  720ms  node_restarted  B restarted (ground truth)
+            <- 17  720ms  recovery_started  action 1 carried out on B
+                <- 16  620ms  recovery_proposed  action 1 granted for B
+                    <- 14  570ms  suspicion_raised  B distrusted by A (heartbeat_timeout)
+                            ...
+                    <- 15  575ms  suspicion_raised  B distrusted by C (heartbeat_timeout)
+                            ...
+```
+
+The two `...` markers are depth, not missing data: below each witness is the receipt that armed its deadline and the
+send that receipt answers, all the way back to the scenario.
+
+That is not a leak of truth into a belief. The restart is a change in the world that a decision caused, the
+decision cites evidence two observers produced, and the news reaches A the only way news ever reaches an observer:
+as a message that crossed a link. What Milestone 3 forbade was an explanation that rested on something nobody could
+observe. This one rests on a decision the log contains in full.
+
+The distinction the two events make is worth naming: **an event the world did by itself explains nothing; an event
+the world did because a decision said so explains the messages it enabled.** The crash is the first kind. The
+restart is the second.
+
+## 6. What changed
+
+| file | change |
+| --- | --- |
+| `internal/domain/action.go` | new: `ActionID`, the closed `ActionKind` vocabulary (one entry), and `Action` with the instant it takes effect |
+| `internal/domain/event.go` | four new kinds, `Event.Action`, and `ReasonInsufficientWitnesses` |
+| `internal/domain/node.go` | `crashed -> running` is a legal transition, and repeating a state still is not |
+| `internal/recovery` | new: `Policy`, `Witness`, `Decision`, and the pure `Gate` that turns the first two into the third |
+| `internal/detector` | `FailureSink`: every written report is handed on with the reference of the line that holds it |
+| `internal/sim` | `Engine.Restart`, recording the start before the world moves; a node resumes its round counter and re-arms its timer from the restart instant |
+| `internal/verify` | new: the proof query — proposal to start to restart, by identifier and edge, never by timestamp |
+| `internal/scenario` | `RecoverySpec`, the loop that holds open cases, `recovered-crash` and `lone-witness`, and their fixtures |
+| `cmd/aegis` | the `DECISION` table with an `EVIDENCE` and `PROOF` column, and both scenarios on `-scenario` |
+| `Makefile` | `make replay` covers four scenarios |
+
+No existing timeline moved. `node-crash` and `one-way-partition` produce the same bytes they produced for v0.3.0:
+their scenarios configure no policy, so no part of recovery runs in them, and a test asserts that not one recovery
+event appears in a run that did not ask for one.
+
+## 7. Decisions
+
+**D1 — The policy is the whole configuration, and there is no switch to skip the gate.**
+A scenario either states the bar for acting or does not act at all. *Rejected:* an `Observe` mode that decides
+without acting — it would produce a log that could not be compared with a run that acted, because the decisions
+would be missing from the file that is supposed to explain them.
+
+**D2 — A witness is a report plus the reference of the event that recorded it.**
+A decision has to cite lines, and a report on its own names none: two observers with identical timings would be
+indistinguishable in the file. The reference is what makes the evidence checkable after the run.
+
+**D3 — The review is armed from the report's own instant, not from the clock.**
+`ReportFailed` schedules the review at `SuspectedAt + Patience`. Patience therefore measures how long the system
+waits for corroboration, not how long the loop took to wake up, and the canonical review at 620 ms is exactly 50 ms
+after A's suspicion at 570 ms. Anchoring to the current instant would have made the delay depend on scheduling
+order — the one thing a deterministic simulator must not do.
+
+**D4 — A case closes exactly once, and later evidence opens a new one.**
+Reports arriving after a review cannot join the decision it already made, because a decision supported by events
+later in the file than itself is not a decision a reader can check. The test for this uses a second observer with a
+500 ms timeout: A reports at 570 ms, the gate refuses at 620 ms on one witness, C reports at 725 ms, and a second
+refusal is written at 775 ms. *Rejected:* waiting for a threshold that may never be reached, which would leave a run
+with no decision in it at all.
+
+**D5 — A refusal is an outcome of the gate, not an error path.**
+Both outcomes travel the same code: witness validation, canonical ordering, a written event, a decision in the
+result. An error is reserved for a decision the history cannot hold — no witnesses, mixed targets, one observer
+voting twice. Those are faults in the caller, and a run that produced one would be a run whose log was incomplete.
+
+**D6 — Verification is a query, not an event.**
+`validate.Action` walks proposal, start and restart by identifier and causality. Nothing is written when it
+succeeds. *Rejected:* a `recovery_verified` event emitted by the component that performed the action, which would
+put the actor's word in the log as if it were a finding.
+
+**D7 — The restart resumes the round counter and re-arms the timer from the restart instant.**
+A node that counted from one again would send a round number twice, and an observer comparing rounds would read the
+second as a reordering rather than as a second life. A timer resumed from the interrupted schedule would backfill
+heartbeats the node never sent while it was down. The first resumed send cites `node_restarted`, so the new life is
+attached to its reason.
+
+**D8 — The detector is given a sink rather than read by the loop.**
+The loop never asks the detector what it has found; it is told, through a one-method interface declared where it is
+consumed. This keeps the detector's knowledge at the domain, and it keeps the decision out of hindsight: acting on
+detections collected after the run would require the loop to decide at an instant that has already passed.
+
+**D9 — The identifier belongs to the decider, and the simulator checks it.**
+`ActionID` is assigned by the component that grants the action, once, and never reused. The simulator refuses a
+restart whose identity it cannot match to a crashed node, a missing cause, a past instant, or a kind with no path
+through it. Verification then asks "was action 1 carried out", which only has an answer if the name means one
+decision for the whole run.
+
