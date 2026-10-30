@@ -54,9 +54,21 @@ func Run(spec Spec, seed uint64) (Result, error) {
 		return Result{}, fmt.Errorf("scenario %s: %w", spec.Name, err)
 	}
 
+	// The recovery loop is built before the observers, because a detector is
+	// handed the loop as its report sink at construction time. Building the loop
+	// first also means a policy that cannot be applied stops the run before any
+	// observer exists to write reports nothing would act on.
+	var loop *recoveryLoop
+	if spec.Recovery != nil {
+		loop, err = newRecoveryLoop(*spec.Recovery, engine, log, engine, engine.Fail)
+		if err != nil {
+			return Result{}, fmt.Errorf("scenario %s: %w", spec.Name, err)
+		}
+	}
+
 	observers := make([]*detector.Detector, 0, len(spec.Observers))
 	for _, o := range spec.Observers {
-		det, err := detector.New(detector.Config{
+		cfg := detector.Config{
 			Observer:  o.Observer,
 			Timeout:   o.Timeout,
 			Clock:     engine,
@@ -64,7 +76,11 @@ func Run(spec Spec, seed uint64) (Result, error) {
 			Recorder:  log,
 			Faults:    engine,
 			Root:      engine.Root(),
-		})
+		}
+		if loop != nil {
+			cfg.Failures = loop
+		}
+		det, err := detector.New(cfg)
 		if err != nil {
 			return Result{}, fmt.Errorf("scenario %s: %w", spec.Name, err)
 		}
@@ -92,10 +108,10 @@ func Run(spec Spec, seed uint64) (Result, error) {
 		return Result{}, fmt.Errorf("scenario %s: %w", spec.Name, err)
 	}
 
-	return collect(spec, engine, log, observers), nil
+	return collect(spec, engine, log, observers, loop), nil
 }
 
-func collect(spec Spec, engine *sim.Engine, log *observability.Recorder, observers []*detector.Detector) Result {
+func collect(spec Spec, engine *sim.Engine, log *observability.Recorder, observers []*detector.Detector, loop *recoveryLoop) Result {
 	res := Result{
 		Spec:    spec,
 		Log:     log,
@@ -114,6 +130,10 @@ func collect(spec Spec, engine *sim.Engine, log *observability.Recorder, observe
 			}
 		}
 		res.Reports = append(res.Reports, det.Reports()...)
+	}
+	if loop != nil {
+		res.Decisions = loop.Decisions()
+		res.Actions = loop.Actions()
 	}
 	return res
 }
