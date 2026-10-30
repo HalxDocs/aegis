@@ -344,3 +344,43 @@ The first prints the two reports and, under them, the receipts those reports res
 proposal, then the reports, then the receipts — the whole argument for why a node that never told anybody it was
 alive came back.
 
+## 11. Verification
+
+```
+gofmt -l .          # empty
+go vet ./...        # empty
+go test ./...       # 9 packages, 291 test functions
+go test -race ./... # clean
+make replay         # node-crash, one-way-partition, recovered-crash, lone-witness: identical
+make check          # fmt, vet, build, test, race
+```
+
+Coverage is 92.4% overall: `observability` 100, `recovery` 98.4, `causal` 96.4, `domain` 94.1, `sim` 93.7,
+`verify` 93.6, `detector` 89.8, `cmd` 88.8, `scenario` 87.7. The project is 12,068 lines of Go, 7,716 of them
+tests.
+
+What the tests establish, in the order the claims are made:
+
+- `recovered-crash` grants exactly one action: proposed at 620 ms citing the two suspicions, started at 720 ms,
+  restarted at 720 ms citing the start, and the first resumed round is round three, citing the restart;
+- both observers clear their belief at 840 ms and 845 ms, after the restart rather than with it, and the test says
+  so by comparing the two instants;
+- `lone-witness` refuses: one refusal at 620 ms citing one report, `insufficient_witnesses`, B still crashed at the
+  horizon, and not one `recovery_started` or `node_restarted` in the file;
+- a report arriving after a decision has been written opens a second case: with one observer on a 500 ms timeout
+  there are two refusals, at 620 ms and after 725 ms, and neither is granted;
+- a run with no policy contains no recovery event, no decision and no action;
+- the verification query finds the full chain in the canonical run, reports an orphan restart as unproven, and does
+  not accept a second restart that names the action without citing the start;
+- the table prints a `DECISION` row per decision, the evidence by reference, and either the three links of the proof
+  or `no complete chain`;
+- both fixtures are byte-identical to the runs that produce them, and both worlds replay with the same bytes on
+  every seed (they draw nothing from the random source);
+- both recovery logs are one rooted graph over three seeds, and every event in them explains itself the way
+  Milestone 3 demanded;
+- the one-outcome invariant holds in a world where a node stops and starts again, which is the test that a resumed
+  node does not reuse a round number.
+
+The fixtures are 37 events for `recovered-crash` and 11 for `lone-witness`. The crash at 215 ms is in both, and in
+both it is cited by nothing: the fourth milestone did not give the crash a voice, it gave the evidence one.
+
