@@ -228,7 +228,7 @@ result. An error is reserved for a decision the history cannot hold — no witne
 voting twice. Those are faults in the caller, and a run that produced one would be a run whose log was incomplete.
 
 **D6 — Verification is a query, not an event.**
-`validate.Action` walks proposal, start and restart by identifier and causality. Nothing is written when it
+`verify.Action` walks proposal, start and restart by identifier and causality. Nothing is written when it
 succeeds. *Rejected:* a `recovery_verified` event emitted by the component that performed the action, which would
 put the actor's word in the log as if it were a finding.
 
@@ -248,4 +248,99 @@ detections collected after the run would require the loop to decide at an instan
 restart whose identity it cannot match to a crashed node, a missing cause, a past instant, or a kind with no path
 through it. Verification then asks "was action 1 carried out", which only has an answer if the name means one
 decision for the whole run.
+
+### What changed while building this
+
+Three things moved after the design settled, and all three are worth recording.
+
+**The proof query first matched by kind, not by edge.** `verify.Action` looked for a `recovery_started` with the
+right action identifier and a `node_restarted` that followed it. A test with a restart that named the action but
+did not cite it caught the difference: two events can share an identifier and an instant without one causing the
+other, and the whole point of the query is to read causation. It now requires `started` to cite `proposed` and
+`applied` to cite `started`, and a restart that merely sits next to its action is reported as unproven.
+
+**One observer, one vote was a test before it was a rule.** The gate initially counted witnesses, which let a
+single node report twice and clear a two-witness bar. The test that reports the same observer twice failed, and the
+rule moved into the gate as `ErrRepeatedObserver` rather than into the loop as bookkeeping.
+
+**The refusal world was rebuilt while the document was being written.** Its first version left C in the cluster
+with no observer, so B heartbeated a node that recorded nothing: two sends with no outcome, which the log cannot
+distinguish from two messages still on the wire. The scenario now has two nodes and one link. The structural graph
+test and the one-outcome invariant also gained both recovery worlds, because until then a recovery log could have
+cited a report that was never written and nothing would have noticed.
+
+## 8. Failure modes, and what stops them
+
+| failure | what it would look like | what stops it |
+| --- | --- | --- |
+| acting on ground truth | a decision that cites the crash, so the system looks right for a reason it could not have had | the gate only ever receives reports and their references; a test asserts the proposal cites the two suspicions and nothing else |
+| restarting a node that never crashed | an action granted from a stale report, applied to a running node | `Engine.Restart` returns `ErrNotCrashed`; the state machine rejects running -> running |
+| a decision supported by later events | a reader who finds the reason for a decision further down the file | the proposal is recorded before the restart is scheduled, and a case closes before later evidence can join it |
+| a refusal nobody can justify | a decision to do nothing, with no evidence and no reason | `ErrNoWitnesses` and `Decision.Validate`; a refusal with no reason cannot be written |
+| one paranoid node acting alone | one observer's silence treated as a majority | `ErrRepeatedObserver` and `MinWitnesses`; the `lone-witness` fixture pins the refusal |
+| evidence about two different nodes | one node's report justifying action on another | `ErrMixedTargets`, checked before anything is written |
+| an action with no proof | a table claiming a restart that the log does not connect | `verify.Action` returns `ok = false`, and the table prints `no complete chain` |
+| a belief cleared by the repair instead of by evidence | trust returning at 720 ms, when the node came back | the detector clears only on a receipt; a test asserts the clearance is at 840 ms and after the restart |
+| a restarted node repeating a round | two messages with one identity, and an observer reading the second as a reordering | the round counter resumes; the one-outcome invariant now runs on `recovered-crash` |
+| recovery sneaking into a scenario that did not ask | a policy applied to a world that states no threshold | a test asserts no recovery event appears without a `RecoverySpec` |
+| a fixture regenerated over a regression | a committed log hiding a changed timeline behind a legitimate new event | the fixtures pin bytes, and separate tests assert the instants (570, 575, 620, 720, 840) from the run itself |
+| a graph that cannot explain a decision | a recovery log whose proposal cites an event that does not exist | the rooted-graph test now runs both recovery worlds over three seeds |
+
+## 9. Known limitations
+
+**One action, one direction.** The only thing recovery can do is restart a crashed node. There is no failover, no
+drain, no rollback, and no way to act on a node that is running but suspected — which is exactly the situation the
+partition milestone produces. A policy in that world would either do nothing or restart a healthy node, and the
+project does not yet have a vocabulary for saying which.
+
+**Nothing stops a crash loop.** A node that crashes again after restart produces a new report, a new case, and a
+new grant. The policy has no memory of what it has already done and no backoff; a world that crashed repeatedly
+would restart repeatedly, and the log would be a faithful record of a bad decision repeated.
+
+**The gate counts observers, not truth.** Two observers behind the same cut both stop hearing the same node and both
+are right about what they heard. The action is justified by the evidence, which is all a decision can ever be
+justified by — but the log should not be read as a claim that the restart was necessary.
+
+**The evidence is not checked for staleness.** A report produced long ago and delivered late still counts at its own
+instant, and patience is measured from `SuspectedAt`, so a report can arrive after its review was already due. The
+loop decides at that deadline with whatever it has, which is the honest behaviour but not a sophisticated one.
+
+**Success is not verified, only occurrence.** Verification proves the proposal, the start and the restart exist in
+one chain. It does not prove the node is healthy afterwards, that its peers agree, or that the action fixed
+anything. The `recovered-crash` run ends with everybody trusting B, but that is a consequence of the heartbeat
+schedule, not a check the system performs.
+
+**A refusal is final for its case.** The only thing that reopens a question is new evidence. A node refused at
+620 ms is not reconsidered at 1200 ms on the same evidence, even though the world may have changed in between.
+
+## 10. How to read a decision
+
+```
+$ go run ./cmd/aegis run --scenario recovered-crash --format table
+...
+DECISION  AT     OUTCOME        EVIDENCE  PROOF
+action 1  620ms  granted for B  14 15     proposed 16, started 17, applied 18
+```
+
+- **`EVIDENCE` lists references, not observers.** `14 15` are the two suspicions the decision weighed. They are
+  sorted, so two renderings of one run cannot differ, and they are the proposal's causes, so `explain -ref 16`
+  prints exactly the branches that produced them.
+- **`PROOF` is a walk, not a claim.** The column is filled from `verify.Action` over the finished log: the start
+  cites the proposal, the restart cites the start. A granted action whose chain is broken prints
+  `no complete chain`, and the table does not pretend otherwise.
+- **A refusal has no proof, and needs none.** `lone-witness` prints `refused (insufficient_witnesses)` with one
+  reference and `no complete chain`, because refusing is not carrying something out.
+- **The decision comes before the world change in the file.** A restart above its own reason is a defect; the file
+  is written so that a reader following the sequence never sees a consequence before its cause.
+
+To check a decision by hand, explain the proposal and then the restart:
+
+```
+$ go run ./cmd/aegis explain -scenario recovered-crash -ref 16
+$ go run ./cmd/aegis explain -scenario recovered-crash -ref 18
+```
+
+The first prints the two reports and, under them, the receipts those reports rest on. The second prints the
+proposal, then the reports, then the receipts — the whole argument for why a node that never told anybody it was
+alive came back.
 
