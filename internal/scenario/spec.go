@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/HalxDocs/aegis/internal/domain"
+	"github.com/HalxDocs/aegis/internal/recovery"
 	"github.com/HalxDocs/aegis/internal/sim"
 )
 
@@ -52,6 +53,11 @@ type PartitionSpec struct {
 // cannot express a setting the simulator does not understand. Crash is optional:
 // a scenario with no crash is how the baseline "nothing goes wrong" run is
 // expressed.
+//
+// Recovery is optional in the same sense: without it a scenario observes and
+// records, and the crash it schedules is never repaired. A scenario that wants
+// the repair has to state the bar for it, because a default policy would be a
+// decision the scenario did not make.
 type Spec struct {
 	Name       string
 	Nodes      []sim.NodeConfig
@@ -59,6 +65,7 @@ type Spec struct {
 	Observers  []ObserverSpec
 	Crash      *CrashSpec
 	Partitions []PartitionSpec
+	Recovery   *RecoverySpec
 	Horizon    domain.Tick
 }
 
@@ -80,6 +87,10 @@ func (s Spec) clone() Spec {
 	if s.Crash != nil {
 		crash := *s.Crash
 		out.Crash = &crash
+	}
+	if s.Recovery != nil {
+		recov := *s.Recovery
+		out.Recovery = &recov
 	}
 	return out
 }
@@ -157,6 +168,12 @@ func (s Spec) validate() error {
 		}
 		if s.Crash.At < 0 {
 			return fmt.Errorf("%w: crash at %d is in the past", ErrInvalidSpec, s.Crash.At)
+		}
+	}
+
+	if s.Recovery != nil {
+		if err := s.Recovery.validate(); err != nil {
+			return err
 		}
 	}
 
@@ -260,4 +277,64 @@ func OneWayPartition() Spec {
 		// is still on a path when the history closes.
 		Horizon: domain.TickFrom(1150 * time.Millisecond),
 	}
+}
+
+// recoveryPolicy is the bar both Milestone 4 scenarios hold an action to.
+//
+// Two witnesses, fifty milliseconds of patience and a hundred of delay. The
+// numbers are chosen so the timing of the log is readable: A reports at 570 ms
+// and C at 575 ms, so the review at 620 ms has both, and the restart lands at
+// 720 ms — comfortably inside the run and well after the decision that caused
+// it.
+func recoveryPolicy() *RecoverySpec {
+	return &RecoverySpec{Policy: recovery.Policy{
+		Kind:         domain.ActionRestartNode,
+		MinWitnesses: 2,
+		Patience:     domain.TickFrom(50 * time.Millisecond),
+		Delay:        domain.TickFrom(100 * time.Millisecond),
+	}}
+}
+
+// RecoveredCrash is the canonical Milestone 4 scenario: the same crash as
+// Milestone 1, with a recovery loop allowed to act on the reports.
+//
+// The run tells the whole story in one log:
+//
+//   - B crashes at 215 ms, after its round two messages have left.
+//   - A reports at 570 ms and C at 575 ms, exactly as in node-crash.
+//   - The gate reviews at 620 ms, two observers are enough, and the action is
+//     proposed and then carried out at 720 ms.
+//   - B resumes at round three — not round one — at 820 ms, and A's belief is
+//     cleared at 840 ms when the message actually arrives.
+//
+// The gap between 720 and 840 is the milestone: a restored node is not a
+// restored belief. A only stops suspecting B when evidence reaches it, which is
+// the same rule that made it suspect B in the first place.
+func RecoveredCrash() Spec {
+	spec := NodeCrash()
+	spec.Name = "recovered-crash"
+	spec.Horizon = domain.TickFrom(1200 * time.Millisecond)
+	spec.Recovery = recoveryPolicy()
+	return spec
+}
+
+// LoneWitness is the refusal scenario.
+//
+// The world is the same and the crash is the same; only the observers differ.
+// With C removed, A is the single node that ever reports, and the policy wants
+// two. At 620 ms the gate refuses with insufficient_witnesses, B stays down for
+// the rest of the run, and the log ends with a written decision not to act.
+//
+// A refusal is the reason this scenario exists. Without it, "two witnesses are
+// required" would be an untested claim, and a single observer's silence would
+// look indistinguishable from a dead node.
+func LoneWitness() Spec {
+	spec := NodeCrash()
+	spec.Name = "lone-witness"
+	spec.Observers = []ObserverSpec{
+		{Observer: "A", Target: "B", Timeout: domain.TickFrom(350 * time.Millisecond)},
+	}
+	spec.Horizon = domain.TickFrom(1200 * time.Millisecond)
+	spec.Recovery = recoveryPolicy()
+	return spec
 }
