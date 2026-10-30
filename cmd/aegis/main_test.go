@@ -120,6 +120,58 @@ func TestRunPartitionScenario(t *testing.T) {
 	}
 }
 
+// TestRunRecoveredCrashTableShowsTheProof checks that the report of a granted
+// action is the chain the log holds, not a summary the table made up.
+func TestRunRecoveredCrashTableShowsTheProof(t *testing.T) {
+	stdout, stderr, err := exec(t, "run", "--scenario", "recovered-crash", "--format", "table")
+	if err != nil {
+		t.Fatalf("run: %v", err)
+	}
+	if stderr != "" {
+		t.Fatalf("stderr = %q, want empty", stderr)
+	}
+	for _, want := range []string{
+		"action 1 granted for B",
+		"action 1 carried out on B",
+		"B restarted (ground truth)",
+		"B trusted again by A",
+		"B      running",
+		"granted for B  14 15",
+		"proposed 16, started 17, applied 18",
+		"reports  2",
+	} {
+		if !strings.Contains(stdout, want) {
+			t.Fatalf("table output is missing %q:\n%s", want, stdout)
+		}
+	}
+}
+
+// TestRunLoneWitnessTableShowsTheRefusal checks the other outcome: a decision
+// that changed nothing, with no chain offered because there is none.
+func TestRunLoneWitnessTableShowsTheRefusal(t *testing.T) {
+	stdout, stderr, err := exec(t, "run", "--scenario", "lone-witness", "--format", "table")
+	if err != nil {
+		t.Fatalf("run: %v", err)
+	}
+	if stderr != "" {
+		t.Fatalf("stderr = %q, want empty", stderr)
+	}
+	for _, want := range []string{
+		"action 1 refused for B (insufficient_witnesses)",
+		"refused (insufficient_witnesses) for B",
+		"no complete chain",
+		"B      crashed",
+		"reports  1",
+	} {
+		if !strings.Contains(stdout, want) {
+			t.Fatalf("table output is missing %q:\n%s", want, stdout)
+		}
+	}
+	if strings.Contains(stdout, "node_restarted") {
+		t.Fatalf("a refused action was restarted anyway:\n%s", stdout)
+	}
+}
+
 func TestRunRejectsUnknownInputs(t *testing.T) {
 	cases := map[string][]string{
 		"no command":       {},
