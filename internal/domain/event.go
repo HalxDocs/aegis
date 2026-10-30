@@ -53,6 +53,23 @@ const (
 
 	// KindLinkRestored records a partitioned direction becoming usable again.
 	KindLinkRestored Kind = "link_restored"
+
+	// KindRecoveryProposed records that the evidence justified an action. Its
+	// causes are the failure reports the decision rests on, so the reasoning is
+	// in the graph rather than in a sentence beside it.
+	KindRecoveryProposed Kind = "recovery_proposed"
+
+	// KindRecoveryRefused records that the evidence did not justify an action.
+	// A refusal is an outcome of the same machinery as a grant: it is written
+	// down, it carries a reason, and it cites what it declined to act on.
+	KindRecoveryRefused Kind = "recovery_refused"
+
+	// KindRecoveryStarted records that a granted action was carried out.
+	KindRecoveryStarted Kind = "recovery_started"
+
+	// KindNodeRestarted records a change in ground truth: a crashed node began
+	// executing again. It is the only way out of StateCrashed.
+	KindNodeRestarted Kind = "node_restarted"
 )
 
 // String returns the kind as written in event logs.
@@ -62,10 +79,11 @@ func (k Kind) String() string { return string(k) }
 func (k Kind) Valid() bool {
 	switch k {
 	case KindScenarioStarted, KindScenarioFinished,
-		KindNodeStarted, KindNodeCrashed,
+		KindNodeStarted, KindNodeCrashed, KindNodeRestarted,
 		KindHeartbeatSent, KindMessageDropped, KindHeartbeatReceived,
 		KindSuspicionRaised, KindSuspicionCleared,
-		KindLinkPartitioned, KindLinkRestored:
+		KindLinkPartitioned, KindLinkRestored,
+		KindRecoveryProposed, KindRecoveryRefused, KindRecoveryStarted:
 		return true
 	default:
 		return false
@@ -82,6 +100,11 @@ const (
 
 	// ReasonPartition means the path was cut while the message was on it.
 	ReasonPartition = "partition"
+
+	// ReasonInsufficientWitnesses means the evidence never reached the policy's
+	// threshold before its patience ran out. It is a statement about the
+	// evidence, not about the target: the node may well be dead.
+	ReasonInsufficientWitnesses = "insufficient_witnesses"
 )
 
 // Event is one entry in the append-only history. It carries virtual time only:
@@ -91,16 +114,18 @@ const (
 // Seq is assigned by the recorder. Node is the event's subject, Peer the
 // counterpart where one exists, Round the heartbeat round for message events,
 // Reason the machine-readable cause, Scenario the run's name on the opening and
-// closing events, and Causes the references that explain why it happened.
+// closing events, Action the recovery decision an event belongs to, and Causes
+// the references that explain why it happened.
 type Event struct {
-	Seq      uint64 `json:"seq"`
-	At       Tick   `json:"at"`
-	Kind     Kind   `json:"kind"`
-	Node     NodeID `json:"node,omitempty"`
-	Peer     NodeID `json:"peer,omitempty"`
-	Round    uint64 `json:"round,omitempty"`
-	Reason   string `json:"reason,omitempty"`
-	Scenario string `json:"scenario,omitempty"`
+	Seq      uint64   `json:"seq"`
+	At       Tick     `json:"at"`
+	Kind     Kind     `json:"kind"`
+	Node     NodeID   `json:"node,omitempty"`
+	Peer     NodeID   `json:"peer,omitempty"`
+	Round    uint64   `json:"round,omitempty"`
+	Reason   string   `json:"reason,omitempty"`
+	Scenario string   `json:"scenario,omitempty"`
+	Action   ActionID `json:"action,omitempty"`
 
 	// Causes names the events that produced this one, in strictly increasing
 	// order. The recorder rejects a reference that does not exist yet, so the
@@ -187,6 +212,32 @@ func (e Event) Validate() error {
 	case KindSuspicionCleared:
 		if err := e.Peer.Validate(); err != nil {
 			return fmt.Errorf("%w: %s requires a peer: %w", ErrInvalidEvent, e.Kind, err)
+		}
+	case KindNodeRestarted:
+		if e.Peer != "" {
+			return fmt.Errorf("%w: %s must not name a peer", ErrInvalidEvent, e.Kind)
+		}
+		if e.Action != 0 {
+			return fmt.Errorf("%w: %s names no action; the restart it follows is its cause", ErrInvalidEvent, e.Kind)
+		}
+	case KindRecoveryProposed, KindRecoveryRefused, KindRecoveryStarted:
+		if !e.Action.Valid() {
+			return fmt.Errorf("%w: %s requires an action identifier", ErrInvalidEvent, e.Kind)
+		}
+		if e.Peer != "" {
+			return fmt.Errorf("%w: %s must not name a peer", ErrInvalidEvent, e.Kind)
+		}
+		// Every recovery event is a claim about evidence, so none of them can
+		// stand alone: a decision with nothing to cite is a decision nobody
+		// could review.
+		if len(e.Causes) == 0 {
+			return fmt.Errorf("%w: %s must cite the evidence it acted on", ErrInvalidEvent, e.Kind)
+		}
+		if e.Kind == KindRecoveryRefused && e.Reason == "" {
+			return fmt.Errorf("%w: %s requires a reason", ErrInvalidEvent, e.Kind)
+		}
+		if e.Kind != KindRecoveryRefused && e.Reason != "" {
+			return fmt.Errorf("%w: %s must not carry a reason", ErrInvalidEvent, e.Kind)
 		}
 	}
 	return nil
