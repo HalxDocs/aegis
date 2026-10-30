@@ -17,7 +17,7 @@ func TestNodeStateTransitions(t *testing.T) {
 		{"running to crashed", domain.StateRunning, domain.StateCrashed, false},
 		{"running to running", domain.StateRunning, domain.StateRunning, true},
 		{"crashed to crashed", domain.StateCrashed, domain.StateCrashed, true},
-		{"crashed to running", domain.StateCrashed, domain.StateRunning, true},
+		{"crashed to running", domain.StateCrashed, domain.StateRunning, false},
 		{"unknown to running", domain.NodeState("exploded"), domain.StateRunning, true},
 		{"running to unknown", domain.StateRunning, domain.NodeState("exploded"), true},
 		{"zero value to crashed", domain.NodeState(""), domain.StateCrashed, true},
@@ -46,6 +46,26 @@ func TestNodeStateTransitions(t *testing.T) {
 			}
 			if got != tc.to {
 				t.Fatalf("TransitionTo(%q) = %q", tc.to, got)
+			}
+		})
+	}
+}
+
+// A node that crashes twice, or restarts while running, is the simulator
+// disagreeing with itself about where the node is. Both are refused rather than
+// tolerated, because a tolerated no-op in the state machine becomes a duplicate
+// event in the history.
+func TestNodeStateRepeatedTransitionsAreRefused(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		from domain.NodeState
+	}{
+		{"restart a running node", domain.StateRunning},
+		{"crash a crashed node", domain.StateCrashed},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if tc.from.CanTransitionTo(tc.from) {
+				t.Fatalf("%s to itself was permitted", tc.from)
 			}
 		})
 	}
