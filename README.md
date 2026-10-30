@@ -11,6 +11,8 @@ heartbeats over links with different latencies, and records what every layer kne
 Milestone 1 crashes one node and shows that the survivors only *suspect* it after their own heartbeat timeouts.
 Milestone 2 cuts one direction of a link and shows the harder case: nobody is broken, and two observers of the same
 node still disagree, because trust is made of evidence rather than topology.
+Milestone 4 lets that evidence act: two independent observers are enough to restart a node, the decision is written
+down before the world changes, and the node does not come back into anybody's trust until a message arrives.
 
 The simulator owns ground truth. Observers never see it.
 
@@ -53,6 +55,41 @@ $ go run ./cmd/aegis run --scenario one-way-partition --format table
 Nothing in this run is down. A one-way cut is the first failure that produces disagreement without a failure:
 B is alive and knows it, C can see it, and A is right about everything it can observe.
 
+## What the recovery run shows
+
+```
+$ go run ./cmd/aegis run --scenario recovered-crash --format table
+```
+
+| t | event |
+| --- | --- |
+| **215 ms** | **B crashes** |
+| 570 ms / 575 ms | A / C stop trusting B |
+| **620 ms** | **the gate reviews: two witnesses, threshold met, action 1 proposed** |
+| **720 ms** | **action 1 carried out and B restarted** |
+| 820 ms | B sends round 3 — the counter resumes where it stopped |
+| 840 ms / 845 ms | A / C stop suspecting B, when the message arrives |
+| 1200 ms | horizon: B running, both observers trust it |
+
+```
+DECISION  AT     OUTCOME        EVIDENCE  PROOF
+action 1  620ms  granted for B  14 15     proposed 16, started 17, applied 18
+```
+
+The proposal cites the two suspicions; the start cites the proposal; the restart cites the start. `PROOF` is not a
+claim by the run — it is the chain read back out of the finished log. The same policy refuses to act when only one
+observer reports:
+
+```
+$ go run ./cmd/aegis run --scenario lone-witness --format table
+DECISION  AT     OUTCOME                                 EVIDENCE  PROOF
+action 1  620ms  refused (insufficient_witnesses) for B  12        no complete chain
+```
+
+A restart is not a recovery of trust. B is running again at 720 ms and A does not stop suspecting it until 840 ms,
+because that is when the first message crosses the link. See [doc_m4.md](doc_m4.md) for the contract, the refusal
+rules, and what the milestone cannot do.
+
 ## Why it happened
 
 ```
@@ -82,13 +119,15 @@ message crosses it. See [doc_m3.md](doc_m3.md) for the contract and its limits.
 
 ## Status
 
-Milestones 1, 2 and 3 are complete. See [doc_m1.md](doc_m1.md), [doc_m2.md](doc_m2.md) and [doc_m3.md](doc_m3.md)
-for every engineering decision, the risks considered, the drift between plan and code, and the verification
-evidence behind each claim.
+Milestones 1, 2, 3 and 4 are complete. See [doc_m1.md](doc_m1.md), [doc_m2.md](doc_m2.md), [doc_m3.md](doc_m3.md)
+and [doc_m4.md](doc_m4.md) for every engineering decision, the risks considered, the drift between plan and code,
+and the verification evidence behind each claim.
 
-Deliberately absent so far: jitter, correlated loss, recovery, diagnosis, scenario files, counterfactual
-comparison, and any real concurrency inside the simulation. A recovery loop that guesses would be worse than no
-recovery loop, and a graph that claimed to explain an absence would be worse than one that admits it cannot.
+Deliberately absent so far: jitter, correlated loss, any action other than a restart, backoff or crash-loop
+detection, diagnosis of *why* a node failed, scenario files, counterfactual comparison, and any real concurrency
+inside the simulation. A recovery loop that guesses would be worse than no recovery loop, a graph that claimed to
+explain an absence would be worse than one that admits it cannot, and an action that certified its own success
+would be worse than one that leaves the proof to a reader.
 
 ## Releases
 
@@ -102,6 +141,7 @@ or pointing at a document that was never written, fails the build.
 | [v0.1.0](https://github.com/HalxDocs/aegis/releases/tag/v0.1.0) — Milestone 1: node crash | The foundation: virtual clock, deterministic scheduler, heartbeats over links with different latencies, observer-side timeouts, and the canonical 16-event `node-crash` run. See [doc_m1.md](doc_m1.md). |
 | [v0.2.0](https://github.com/HalxDocs/aegis/releases/tag/v0.2.0) — Milestone 2: one-way partitions | A cut as a schedule on the wire rather than a flag: `Engine.PartitionAt`, the `link_partitioned` and `link_restored` events, and the `one-way-partition` scenario with its 75-event golden fixture. Nothing crashes, and a node is still distrusted for 350 ms. |
 | [v0.3.0](https://github.com/HalxDocs/aegis/releases/tag/v0.3.0) — Milestone 3: causal history | Every event cites the events that caused it, so the log is also a graph: `Event.Causes`, `Recorder.Record` handing back the reference it assigned, and a new `aegis explain` command that walks either a live run or a JSONL history read from disk. A file edited after the fact is refused by the rule it broke, never explained. The crash explains no belief, and the repair explains nothing. See [doc_m3.md](doc_m3.md). |
+| [v0.4.0](https://github.com/HalxDocs/aegis/releases/tag/v0.4.0) — Milestone 4: recovery that has to be proved | The first milestone that changes the world. A policy of two witnesses, 50 ms of patience and 100 ms of delay; a pure gate that writes a proposal or a refusal before anything happens; `Engine.Restart` resuming a node at the round it stopped on; and `internal/verify`, a query that reads proposal, start and restart back out of the log because nothing in a run may certify itself. `recovered-crash` brings B back at 720 ms and A does not trust it until 840 ms; `lone-witness` refuses, with a reason, and leaves it down. See [doc_m4.md](doc_m4.md). |
 
 ## Requirements
 
@@ -115,6 +155,8 @@ make check                                                      # gofmt, vet, bu
 make replay                                                     # every scenario twice, byte-for-byte
 make demo                                                       # human-readable event log
 make explain                                                    # why A distrusted B, and what it rested on
+go run ./cmd/aegis run --scenario recovered-crash --format table  # a decision, and the proof it happened
+go run ./cmd/aegis run --scenario lone-witness --format table     # the same policy declining to act
 
 go run ./cmd/aegis run --scenario node-crash --format jsonl      # canonical machine-readable log
 go run ./cmd/aegis run --scenario one-way-partition --format table
@@ -136,6 +178,8 @@ internal/sim            virtual clock, deterministic scheduler, network, nodes, 
 internal/detector       observer-side suspicion from heartbeat timeouts
 internal/observability  append-only event history and JSONL encoding
 internal/causal         the history read as a graph of reasons
+internal/recovery       the policy, the witnesses, and the gate that decides between them
+internal/verify         the proof that a granted action was carried out, read from the log
 internal/scenario       scenario specifications, golden fixtures, the runner
 docs/                   the milestone plan and the five-minute talk
 ```
@@ -144,8 +188,9 @@ A spoken walkthrough of both runs, built to be delivered in five minutes, is in
 [docs/talk-five-minutes.md](docs/talk-five-minutes.md).
 
 The dependency rule is one-way: `cmd` and `scenario` may know every component; the simulator knows the domain; the
-detector knows only the domain, so it has no way to read ground truth, and the causal explainer knows only the
-events, so it has no way to ask what really happened.
+detector knows only the domain, so it has no way to read ground truth; the gate knows the domain and the reports
+handed to it, so it cannot ask the simulator anything; the causal explainer and the verifier know only the events,
+so they have no way to ask what really happened.
 
 ## Licence
 
