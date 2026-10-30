@@ -13,6 +13,12 @@ var (
 
 	// ErrHorizonBeforeNow is returned when a run asks to move backwards.
 	ErrHorizonBeforeNow = errors.New("run horizon precedes the current time")
+
+	// ErrNotCrashed is returned when an action asks to restart a node that is
+	// still running. It is an error rather than a no-op because an action is
+	// only ever granted against a failure report, and restarting a healthy node
+	// would mean the evidence and the world disagreed.
+	ErrNotCrashed = errors.New("node is not crashed")
 )
 
 // Run executes scheduled work until the horizon, then parks the clock there.
@@ -60,6 +66,62 @@ func (e *Engine) CrashAt(at domain.Tick, id domain.NodeID) error {
 		return fmt.Errorf("schedule crash of %s at %d: %w", id, at, err)
 	}
 	return nil
+}
+
+// Restart performs a granted recovery action at the instant the action names.
+//
+// The simulator is the only component that can move a node out of the crashed
+// state, and it only does so on behalf of an action that already carries a
+// decision. The decision's evidence is not re-read here: the action was granted
+// in the log, and this call is the consequence of that grant rather than a
+// second opinion about it.
+//
+// cause is the reference of the event that proposed the action, which becomes
+// the reason the restart happened. A restart with nothing to cite would be a
+// change in ground truth that no observer's account explains.
+func (e *Engine) Restart(a domain.Action, cause domain.Ref) error {
+	if err := a.Validate(); err != nil {
+		return err
+	}
+	if a.Kind != domain.ActionRestartNode {
+		return fmt.Errorf("%w: %s has no path through the simulator", domain.ErrInvalidAction, a.Kind)
+	}
+	n, ok := e.nodes[a.Target]
+	if !ok {
+		return fmt.Errorf("%w: %s", ErrUnknownNode, a.Target)
+	}
+	if n.state != domain.StateCrashed {
+		return fmt.Errorf("%w: %s is %s", ErrNotCrashed, a.Target, n.state)
+	}
+	if !cause.Valid() {
+		return fmt.Errorf("%w: %s cites no cause", domain.ErrInvalidAction, a.ID)
+	}
+	if a.At < e.sched.now {
+		return fmt.Errorf("%w: restart at %d, now %d", ErrScheduleInPast, a.At, e.sched.now)
+	}
+	if _, err := e.sched.At(a.At, func() { e.fail(e.applyRestart(a, cause)) }); err != nil {
+		return fmt.Errorf("schedule restart of %s at %d: %w", a.Target, a.At, err)
+	}
+	return nil
+}
+
+// applyRestart writes the action into the history, then lets the node resume.
+//
+// The action is recorded first so the log shows the decision being carried out
+// before the world changes. A reader therefore never finds a node_restarted
+// event whose reason appears later in the file than the restart itself.
+func (e *Engine) applyRestart(a domain.Action, cause domain.Ref) error {
+	started, err := e.record(domain.Event{
+		At:     a.At,
+		Kind:   domain.KindRecoveryStarted,
+		Node:   a.Target,
+		Action: a.ID,
+		Causes: []domain.Ref{cause},
+	})
+	if err != nil {
+		return fmt.Errorf("record %s of %s: %w", domain.KindRecoveryStarted, a.ID, err)
+	}
+	return e.nodes[a.Target].restart(a.At, started)
 }
 
 // PartitionAt cuts one direction of a link for a fixed interval and records both
