@@ -23,7 +23,8 @@ const usage = `usage: aegis run [flags]
        aegis explain -ref <seq> [flags]
 
 run flags:
-  -scenario string  scenario to run: node-crash or one-way-partition (default "node-crash")
+  -scenario string  scenario to run (default "node-crash")
+                    node-crash, one-way-partition, recovered-crash, lone-witness
   -seed uint        seed for deterministic decisions (default 0)
   -format string    output format: jsonl or table (default "jsonl")
 
@@ -192,7 +193,11 @@ func lookup(name string) (scenario.Spec, error) {
 		return scenario.NodeCrash(), nil
 	case "one-way-partition":
 		return scenario.OneWayPartition(), nil
+	case "recovered-crash":
+		return scenario.RecoveredCrash(), nil
+	case "lone-witness":
+		return scenario.LoneWitness(), nil
 	default:
-		return scenario.Spec{}, fmt.Errorf("unknown scenario %q (available: node-crash, one-way-partition)", name)
+		return scenario.Spec{}, fmt.Errorf("unknown scenario %q (available: node-crash, one-way-partition, recovered-crash, lone-witness)", name)
 	}
 }
