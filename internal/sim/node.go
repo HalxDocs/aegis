@@ -64,8 +64,15 @@ type node struct {
 	// lastSent remembers the reference of the last message sent to each peer,
 	// which is the cause of the next round on that direction.
 	lastSent map[domain.NodeID]domain.Ref
-	timer    domain.Timer
-	eng      *Engine
+
+	// resumed holds the reference of this node's restart until the next round
+	// has gone out. A round sent after a restart could not have happened without
+	// it, so the resumed chain names the event that revived the node instead of
+	// walking past the crash to the original start.
+	resumed domain.Ref
+
+	timer domain.Timer
+	eng   *Engine
 }
 
 func newNode(cfg NodeConfig, eng *Engine) *node {
@@ -130,16 +137,23 @@ func (n *node) beat(at domain.Tick) error {
 		}
 		n.lastSent[peer] = sent
 	}
+	// The restart has now been cited by every peer's next round, so later rounds
+	// fall back to the per-direction chain.
+	n.resumed = 0
 	return n.scheduleHeartbeat(at)
 }
 
 // causeFor returns the event that caused the next heartbeat to peer: the
-// previous send on the same direction, or this node's start for the first round.
+// restart that resumed the node, the previous send on the same direction, or
+// this node's start for the first round.
 //
 // It is per peer rather than per node because each direction has its own
 // schedule; one chain for the whole node would claim a link's round two was
 // caused by another link's round one.
 func (n *node) causeFor(peer domain.NodeID) domain.Ref {
+	if n.resumed.Valid() {
+		return n.resumed
+	}
 	if ref, ok := n.lastSent[peer]; ok {
 		return ref
 	}
@@ -153,6 +167,45 @@ func (n *node) causeFor(peer domain.NodeID) domain.Ref {
 // the subtle window this milestone exists to show. Nothing outside the
 // simulator is told about the crash, because an observer that was told would no
 // longer be observing.
+// restart brings a crashed node back into execution on behalf of a granted
+// recovery action, and resumes its heartbeat where it stopped.
+//
+// The round counter is not reset. A restarted node that counted from one again
+// would send the same round number twice, and an observer comparing rounds
+// would read the second as a reordering rather than as a second life. The first
+// round after the restart cites the node_restarted event, so the resumed chain
+// runs through the reason the node is alive rather than past the crash it
+// survived.
+//
+// The timer is armed from the restart instant rather than from the interrupted
+// schedule: the node was not executing while it was down, and resuming a timer
+// that would already have fired several times would backfill heartbeats the
+// node never sent.
+func (n *node) restart(at domain.Tick, cause domain.Ref) error {
+	next, err := n.state.TransitionTo(domain.StateRunning)
+	if err != nil {
+		return fmt.Errorf("node %s: restart: %w", n.id, err)
+	}
+	n.state = next
+	if n.timer != nil {
+		n.timer.Cancel()
+	}
+	restarted, err := n.eng.record(domain.Event{
+		At:     at,
+		Kind:   domain.KindNodeRestarted,
+		Node:   n.id,
+		Causes: []domain.Ref{cause},
+	})
+	if err != nil {
+		return fmt.Errorf("node %s: record restart: %w", n.id, err)
+	}
+	n.resumed = restarted
+	if n.every == 0 {
+		return nil
+	}
+	return n.scheduleHeartbeat(at)
+}
+
 func (n *node) crash(at domain.Tick) error {
 	next, err := n.state.TransitionTo(domain.StateCrashed)
 	if err != nil {
