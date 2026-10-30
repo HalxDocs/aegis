@@ -1,5 +1,5 @@
 GO ?= go
-SCENARIOS ?= node-crash one-way-partition
+SCENARIOS ?= node-crash one-way-partition recovered-crash lone-witness
 REF ?= 14
 
 .PHONY: all build fmt fmt-check vet test race check cover replay demo explain clean
