@@ -33,6 +33,11 @@ or a cause that has not been written yet, which turns the graph into something t
 Can fail by: pointing a receipt at the crash, or at the cut, because they are the "real" reason the evidence
 stopped. That would make every explanation agree with the simulator and with nothing the observer could have known.
 
+The claim is stated for the two worlds this milestone ships, where ground truth never changes: a crash and a cut
+both produce nothing, so nothing can be descended from them. Milestone 4 adds a restart, which is the first change
+in ground truth with descendants, and says there why that is not a breach — see
+[§4 of doc_m4.md](doc_m4.md#4-the-four-claims-and-how-each-one-can-fail).
+
 **C3 — The graph explains what happened, and says nothing about what did not.**
 Can fail by: pretending it is complete. A suspicion caused by a cut is descended from the last message that
 arrived, not from the cut, because the cut prevented messages rather than producing one. An explanation that hid
