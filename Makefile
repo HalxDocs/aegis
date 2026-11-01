@@ -2,7 +2,11 @@ GO ?= go
 SCENARIOS ?= node-crash one-way-partition recovered-crash lone-witness
 REF ?= 14
 
-.PHONY: all build fmt fmt-check vet test race check cover replay demo explain clean
+# The explainer page lives beside this repository rather than in it. CI checks
+# out this repository alone, so it is a separate target with no lab to run.
+LAB ?= ../aegis-lab
+
+.PHONY: all build fmt fmt-check vet test race check check-all lab-check cover replay demo explain clean
 
 all: check
 
@@ -32,6 +36,26 @@ cover:
 	@$(GO) tool cover -func=coverage.out | tail -1
 
 check: fmt-check vet build test race
+
+# The page's own proof: it re-measures this repository's gate, compares all four
+# fixtures against it byte for byte, and builds. It runs `make replay` itself, so
+# a `check-all` run replays the scenarios twice — once here, once for the card.
+lab-check:
+	@if [ ! -d "$(LAB)" ]; then \
+		echo "lab not found at $(LAB); set LAB=/path/to/aegis-lab"; \
+		exit 1; \
+	fi
+	@command -v npm >/dev/null 2>&1 || { echo "npm is required to check the lab"; exit 1; }
+	cd "$(LAB)" && npm run check
+
+# Both sides, one command: the Go gate first, then the page that explains it.
+#
+# Serial on purpose even under -j: the lab's gate re-measures this repository, and
+# running that while the repository's own race tests are in flight buys nothing
+# and reads as one gate instead of two.
+.NOTPARALLEL: check-all
+
+check-all: check lab-check
 
 # Two runs of every scenario must produce identical bytes. Comparing parsed
 # events would miss reordering, which is exactly the defect this target exists to
