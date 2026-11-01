@@ -147,11 +147,14 @@ or pointing at a document that was never written, fails the build.
 
 - Go 1.25 or newer
 - `make` (optional; every target is a plain `go` command)
+- Node.js and npm, only for `make check-all`, which also checks the explainer page if it is checked out beside this
+  repository (`LAB=...` points the target elsewhere)
 
 ## Quick start
 
 ```bash
 make check                                                      # gofmt, vet, build, tests, race detector
+make check-all                                                  # the above, then the page's own proof (needs ../aegis-lab)
 make replay                                                     # every scenario twice, byte-for-byte
 make demo                                                       # human-readable event log
 make explain                                                    # why A distrusted B, and what it rested on
