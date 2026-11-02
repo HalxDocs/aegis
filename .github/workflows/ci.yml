@@ -31,3 +31,42 @@ jobs:
         run: make replay
       - name: Coverage summary
         run: make cover
+
+  # The page lives in its own repository, so this job is the only one that can
+  # run the combined gate. It runs all of it rather than just the lab half: a
+  # job that proves `make check-all` works but skips half of it would prove
+  # nothing about the half it skipped, and the two halves are cheap next to one
+  # another.
+  lab:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      # Cached against the lab's lockfile, which is not in this checkout yet at
+      # this point in the run; the key is the file's path, not its contents.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: aegis-lab/package-lock.json
+      # Actions can only check out inside the workspace, so the page lands in a
+      # subdirectory rather than beside this repository as it does locally.
+      - uses: actions/checkout@v4
+        with:
+          repository: HalxDocs/aegis-lab
+          path: aegis-lab
+      - name: Install the page's dependencies
+        run: npm ci
+        working-directory: aegis-lab
+      # LAB points at the subdirectory; AEGIS_GO_REPO points the page's gate back
+      # at this checkout, since it would otherwise look for a sibling directory.
+      - name: Gate both sides
+        run: make check-all
+        env:
+          LAB: aegis-lab
+          AEGIS_GO_REPO: ${{ github.workspace }}
