@@ -190,6 +190,11 @@ docs/                   the milestone plan and the five-minute talk
 A spoken walkthrough of both runs, built to be delivered in five minutes, is in
 [docs/talk-five-minutes.md](docs/talk-five-minutes.md).
 
+The live explainer page is its own repository, [HalxDocs/aegis-lab](https://github.com/HalxDocs/aegis-lab).
+`make check-all` runs it from a checkout beside this one; CI is the only place the two are checked out together, as a
+subdirectory of this workspace, and it runs the same command with `LAB` and `AEGIS_GO_REPO` set to say where each side
+is.
+
 The dependency rule is one-way: `cmd` and `scenario` may know every component; the simulator knows the domain; the
 detector knows only the domain, so it has no way to read ground truth; the gate knows the domain and the reports
 handed to it, so it cannot ask the simulator anything; the causal explainer and the verifier know only the events,
