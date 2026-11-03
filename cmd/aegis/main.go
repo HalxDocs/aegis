@@ -184,20 +184,38 @@ func source(path, name string) string {
 	return "scenario " + name
 }
 
-// lookup keeps the set of runnable scenarios explicit. Reading scenarios from
-// files is a later milestone; until then an unknown name is an error rather
-// than an empty run.
-func lookup(name string) (scenario.Spec, error) {
-	switch name {
-	case "node-crash":
-		return scenario.NodeCrash(), nil
-	case "one-way-partition":
-		return scenario.OneWayPartition(), nil
-	case "recovered-crash":
-		return scenario.RecoveredCrash(), nil
-	case "lone-witness":
-		return scenario.LoneWitness(), nil
-	default:
-		return scenario.Spec{}, fmt.Errorf("unknown scenario %q (available: node-crash, one-way-partition, recovered-crash, lone-witness)", name)
+// runnable is the set of scenarios this command offers, in the order they are
+// announced. It is the only list: lookup dispatches from it and the
+// unknown-scenario error quotes it, so a scenario cannot be run without being
+// named, and a name cannot be offered without something to run.
+//
+// Reading scenarios from files is a later milestone; until then an unknown name
+// is an error rather than an empty run.
+var runnable = []struct {
+	name  string
+	build func() scenario.Spec
+}{
+	{name: "node-crash", build: scenario.NodeCrash},
+	{name: "one-way-partition", build: scenario.OneWayPartition},
+	{name: "recovered-crash", build: scenario.RecoveredCrash},
+	{name: "lone-witness", build: scenario.LoneWitness},
+}
+
+// scenarioNames lists the runnable scenarios as a reader would type them.
+func scenarioNames() []string {
+	out := make([]string, 0, len(runnable))
+	for _, s := range runnable {
+		out = append(out, s.name)
 	}
+	return out
+}
+
+// lookup returns the spec for a named scenario.
+func lookup(name string) (scenario.Spec, error) {
+	for _, s := range runnable {
+		if s.name == name {
+			return s.build(), nil
+		}
+	}
+	return scenario.Spec{}, fmt.Errorf("unknown scenario %q (available: %s)", name, strings.Join(scenarioNames(), ", "))
 }
