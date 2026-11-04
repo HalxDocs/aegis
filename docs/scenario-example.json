@@ -1,0 +1,24 @@
+{
+  "name": "recovered-crash",
+  "horizon": "1200ms",
+  "nodes": [
+    {"id": "A"},
+    {"id": "B", "heartbeat_every": "100ms", "peers": ["A", "C"]},
+    {"id": "C"}
+  ],
+  "links": [
+    {"from": "B", "to": "A", "latency": "20ms"},
+    {"from": "B", "to": "C", "latency": "25ms"}
+  ],
+  "observers": [
+    {"observer": "A", "target": "B", "timeout": "350ms"},
+    {"observer": "C", "target": "B", "timeout": "350ms"}
+  ],
+  "crash": {"node": "B", "at": "215ms"},
+  "recovery": {
+    "kind": "restart_node",
+    "min_witnesses": 2,
+    "patience": "50ms",
+    "delay": "100ms"
+  }
+}

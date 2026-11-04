@@ -9,7 +9,9 @@ import (
 
 func TestEventValidateAcceptsEachKind(t *testing.T) {
 	events := map[string]domain.Event{
-		"scenario started":  {Kind: domain.KindScenarioStarted, Scenario: "node-crash"},
+		"scenario started": {
+			Kind: domain.KindScenarioStarted, Scenario: "node-crash", Schema: domain.EventLogSchema,
+		},
 		"scenario finished": {Kind: domain.KindScenarioFinished, At: tick(1200), Scenario: "node-crash"},
 		"node started":      {Kind: domain.KindNodeStarted, Node: "A"},
 		"node crashed":      {Kind: domain.KindNodeCrashed, At: tick(215), Node: "B"},
@@ -49,7 +51,7 @@ func TestEventValidateRejectsIncompleteEvents(t *testing.T) {
 	cases := map[string]domain.Event{
 		"unknown kind":               {Kind: domain.Kind("node_vanished"), Node: "A"},
 		"negative time":              {Kind: domain.KindNodeStarted, At: -1, Node: "A"},
-		"scenario without a name":    {Kind: domain.KindScenarioStarted},
+		"scenario without a name":    {Kind: domain.KindScenarioStarted, Schema: domain.EventLogSchema},
 		"scenario naming a node":     {Kind: domain.KindScenarioStarted, Scenario: "node-crash", Node: "A"},
 		"node event without node":    {Kind: domain.KindNodeCrashed, At: tick(215)},
 		"node event with a peer":     {Kind: domain.KindNodeCrashed, At: tick(215), Node: "B", Peer: "A"},
@@ -81,6 +83,9 @@ func TestEventValidateRejectsIncompleteEvents(t *testing.T) {
 		},
 		"restart of no node":     {Kind: domain.KindNodeRestarted, At: tick(625), Action: 1},
 		"restart with an action": {Kind: domain.KindNodeRestarted, At: tick(625), Node: "B", Action: 1},
+		"schema on another kind": {
+			Kind: domain.KindNodeStarted, Node: "A", Schema: domain.EventLogSchema,
+		},
 	}
 	for name, event := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -88,6 +93,45 @@ func TestEventValidateRejectsIncompleteEvents(t *testing.T) {
 				t.Fatalf("Validate() = %v, want ErrInvalidEvent", err)
 			}
 		})
+	}
+}
+
+// TestSchemaBelongsToTheOpeningEvent pins where the log's format is written.
+//
+// The rule is that the first line says what the file is and no other line may
+// claim otherwise: a version repeated on every event is a version that can
+// disagree with itself, and a reader has no rule for which line wins.
+func TestSchemaBelongsToTheOpeningEvent(t *testing.T) {
+	missing := domain.Event{Kind: domain.KindScenarioStarted, Scenario: "node-crash"}
+	if err := missing.Validate(); !errors.Is(err, domain.ErrUnsupportedSchema) {
+		t.Fatalf("an unversioned opener: error = %v, want ErrUnsupportedSchema", err)
+	}
+
+	future := domain.Event{Kind: domain.KindScenarioStarted, Scenario: "node-crash", Schema: "aegis.eventlog/v2"}
+	if err := future.Validate(); !errors.Is(err, domain.ErrUnsupportedSchema) {
+		t.Fatalf("a newer opener: error = %v, want ErrUnsupportedSchema", err)
+	}
+
+	mid := domain.Event{Kind: domain.KindSuspicionRaised, Node: "A", Peer: "B", Reason: domain.ReasonHeartbeatTimeout,
+		Schema: domain.EventLogSchema}
+	if err := mid.Validate(); !errors.Is(err, domain.ErrInvalidEvent) {
+		t.Fatalf("a versioned middle event: error = %v, want ErrInvalidEvent", err)
+	}
+
+	// WithSchema is how a recorder fills the format in, so it must accept the
+	// omission and refuse the disagreement rather than silently overwriting.
+	stamped, err := domain.WithSchema(missing)
+	if err != nil {
+		t.Fatalf("WithSchema(no schema) = %v", err)
+	}
+	if stamped.Schema != domain.EventLogSchema {
+		t.Fatalf("stamped schema = %q", stamped.Schema)
+	}
+	if err := stamped.Validate(); err != nil {
+		t.Fatalf("the stamped opener was rejected: %v", err)
+	}
+	if _, err := domain.WithSchema(future); !errors.Is(err, domain.ErrUnsupportedSchema) {
+		t.Fatalf("WithSchema(newer) = %v, want ErrUnsupportedSchema", err)
 	}
 }
 

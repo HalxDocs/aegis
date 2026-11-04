@@ -124,8 +124,8 @@ and [doc_m4.md](doc_m4.md) for every engineering decision, the risks considered,
 and the verification evidence behind each claim.
 
 Deliberately absent so far: jitter, correlated loss, any action other than a restart, backoff or crash-loop
-detection, diagnosis of *why* a node failed, scenario files, counterfactual comparison, and any real concurrency
-inside the simulation. A recovery loop that guesses would be worse than no recovery loop, a graph that claimed to
+detection, diagnosis of *why* a node failed, counterfactual comparison, and any real concurrency inside the
+simulation. A recovery loop that guesses would be worse than no recovery loop, a graph that claimed to
 explain an absence would be worse than one that admits it cannot, and an action that certified its own success
 would be worse than one that leaves the proof to a reader.
 
@@ -168,10 +168,17 @@ go run ./cmd/aegis explain -scenario one-way-partition -ref 61   # the reasons b
 go run ./cmd/aegis run --format jsonl > run.jsonl               # also: explain a log from disk
 go run ./cmd/aegis explain -log run.jsonl -ref 14
 go run ./cmd/aegis scenarios                                   # what can run, one name per line
+go run ./cmd/aegis version                                     # the build, and the format it reads
+go run ./cmd/aegis run --file world.json --format table         # a scenario written as a file
 ```
 
 The JSONL log is the canonical artifact: one event per line, virtual timestamps only, sequence numbers assigned by
 the recorder. The table view is rendered from those events and is never a second source of truth.
+
+The first line of a log says what the file is: `"schema": "aegis.eventlog/v1"` on the event that opens the history,
+and on no other event. A version repeated on every line could disagree with itself, and a reader would have no rule
+for which line wins. `aegis version` prints the same string beside the build that writes it, and a log naming any
+other format is refused outright rather than decoded with the wrong rules.
 
 `make hooks` points `core.hooksPath` at `hooks/`, where a pre-push hook runs `make check-all` (or `make check` if
 the page is not checked out) before anything leaves the machine. Branch protection cannot do this: requiring status
@@ -182,10 +189,79 @@ checks rejects a direct push to `main` with `GH006`, because the checks only exi
 tool that needs to know — the explainer page's parity check, a script, a person — asks the binary instead of
 parsing `main.go`. It is an interface, not decoration; adding a scenario means it shows up there too.
 
+## Scenario files
+
+A scenario can be a file instead of a name in the binary. It is the same world either way: the format expresses every
+setting the four built-in scenarios use, and a file describing `recovered-crash` produces that scenario's log byte for
+byte.
+
+A whole world is small enough to read:
+
+```json
+{
+  "name": "watched-heartbeat",
+  "horizon": "400ms",
+  "nodes": [
+    {"id": "A"},
+    {"id": "B", "heartbeat_every": "100ms", "peers": ["A"]}
+  ],
+  "links": [{"from": "B", "to": "A", "latency": "20ms"}],
+  "observers": [{"observer": "A", "target": "B", "timeout": "350ms"}]
+}
+```
+
+[docs/scenario-example.json](docs/scenario-example.json) is the full case: `recovered-crash` written out as a file,
+crash, policy and all. It is not a copy that can drift — a test loads it, runs it, and compares the log with the
+built-in scenario's.
+
+```
+$ go run ./cmd/aegis run --file docs/scenario-example.json --format table
+```
+
+Times are Go duration strings, because a scenario is read by people first. Every key is required to be a key the
+format knows: a misspelled `observor` is an error, not an empty list, since a file that quietly observes nothing is
+worse than one that says why it cannot run. `crash`, `partitions` and `recovery` may be omitted; `-file` and
+`-scenario` cannot both be passed, because they answer the same question and there is no precedence to invent.
+
+Reading from files does not make the built-in scenarios redundant. They are the fixtures the page's parity check and
+the committed logs in `internal/scenario/testdata` are pinned to, and a test writes each of them out in this format,
+reads it back and compares the two logs — so the format cannot forget a field the simulator accepts.
+
+## Using it from Go
+
+`github.com/HalxDocs/aegis` is an importable package, and it is deliberately narrow: the event vocabulary, the history
+read as a graph of reasons, the gate that weighs evidence, and the verifier that reads a proof back out of a finished
+log. It is not the simulator. Running a scenario is the command's job; the exported parts are the ones that can be
+trusted without knowing what really happened.
+
+```go
+events, err := aegis.ReadLog(file)      // refuses a log naming another schema
+idx, err := aegis.NewIndex(events)     // the same events, as a graph
+proofs, err := aegis.VerifyActions(idx) // which actions the log actually proves
+
+gate, err := aegis.NewGate(aegis.Policy{
+	Kind:         aegis.ActionRestartNode,
+	MinWitnesses: 2,
+	Patience:     aegis.TickFrom(50 * time.Millisecond),
+	Delay:        aegis.TickFrom(100 * time.Millisecond),
+})
+decision, err := gate.Decide(witnesses) // granted, or refused with a reason
+```
+
+Every exported name is an alias of the type that implements it, so there is no second definition to drift. What is
+behind it — `domain`, `sim`, `detector`, `scenario`, `causal`, `recovery`, `verify` — stays `internal`, because those
+shapes still move with each milestone and a promise not to move them would be a promise the project cannot keep.
+
+`examples/consumer` is a separate module that imports the package, and `make api-check` runs it. It has to be a
+separate module to be a proof: code inside this module can reach `internal` whatever the public package claims, while
+code outside it cannot, so the target fails to build the moment an exported name is only reachable from inside.
+
 ## Layout
 
 ```
+aegis.go                the importable surface: aliases, ReadLog, the gate, the verifier
 cmd/aegis               command-line entry point and table rendering
+examples/consumer       a separate module proving the surface is importable from outside
 internal/domain         core vocabulary: virtual time, ids, node and belief states, events
 internal/sim            virtual clock, deterministic scheduler, network, nodes, engine
 internal/detector       observer-side suspicion from heartbeat timeouts
@@ -193,7 +269,7 @@ internal/observability  append-only event history and JSONL encoding
 internal/causal         the history read as a graph of reasons
 internal/recovery       the policy, the witnesses, and the gate that decides between them
 internal/verify         the proof that a granted action was carried out, read from the log
-internal/scenario       scenario specifications, golden fixtures, the runner
+internal/scenario       scenario specifications, the file format, golden fixtures, the runner
 docs/                   the milestone plan and the five-minute talk
 ```
 

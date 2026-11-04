@@ -6,7 +6,7 @@ REF ?= 14
 # out this repository alone, so it is a separate target with no lab to run.
 LAB ?= ../aegis-lab
 
-.PHONY: all build fmt fmt-check vet test race check check-all lab-check cover replay demo explain clean hooks
+.PHONY: all build fmt fmt-check vet test race check check-all lab-check api-check cover replay demo explain clean hooks
 
 all: check
 
@@ -35,7 +35,15 @@ cover:
 	$(GO) test -coverprofile=coverage.out ./...
 	@$(GO) tool cover -func=coverage.out | tail -1
 
-check: fmt-check vet build test race
+check: fmt-check vet build test race api-check
+
+# The exported surface is proved from outside the module, because that is the
+# only place the `internal` rule applies. examples/consumer is its own module, so
+# it compiles only while everything the public package names is genuinely
+# reachable: a type left under internal turns this target into a build failure
+# rather than a claim in a README.
+api-check:
+	cd examples/consumer && $(GO) run . >/dev/null
 
 # The page's own proof: it re-measures this repository's gate, compares all four
 # fixtures against it byte for byte, and builds. It runs `make replay` itself, so

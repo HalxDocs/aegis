@@ -48,11 +48,11 @@ func TestASingleCauseNeedsNoOrdering(t *testing.T) {
 }
 
 func TestScenarioStartCannotCiteACause(t *testing.T) {
-	start := Event{At: 0, Kind: KindScenarioStarted, Scenario: "node-crash", Causes: []Ref{1}}
+	start := Event{At: 0, Kind: KindScenarioStarted, Scenario: "node-crash", Schema: EventLogSchema, Causes: []Ref{1}}
 	if err := start.Validate(); !errors.Is(err, ErrInvalidCause) {
 		t.Fatalf("error = %v, want ErrInvalidCause", err)
 	}
-	ok := Event{At: 0, Kind: KindScenarioStarted, Scenario: "node-crash"}
+	ok := Event{At: 0, Kind: KindScenarioStarted, Scenario: "node-crash", Schema: EventLogSchema}
 	if err := ok.Validate(); err != nil {
 		t.Fatalf("the opening event was rejected: %v", err)
 	}

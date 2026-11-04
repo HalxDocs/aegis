@@ -1,4 +1,4 @@
-{"seq":1,"at":0,"kind":"scenario_started","scenario":"recovered-crash"}
+{"seq":1,"at":0,"kind":"scenario_started","scenario":"recovered-crash","schema":"aegis.eventlog/v1"}
 {"seq":2,"at":0,"kind":"node_started","node":"A","causes":[1]}
 {"seq":3,"at":0,"kind":"node_started","node":"B","causes":[1]}
 {"seq":4,"at":0,"kind":"node_started","node":"C","causes":[1]}

@@ -22,10 +22,12 @@ import (
 const usage = `usage: aegis run [flags]
        aegis explain -ref <seq> [flags]
        aegis scenarios
+       aegis version
 
 run flags:
   -scenario string  scenario to run (default "node-crash")
                     node-crash, one-way-partition, recovered-crash, lone-witness
+  -file string      a scenario file to run instead of a built-in scenario
   -seed uint        seed for deterministic decisions (default 0)
   -format string    output format: jsonl or table (default "jsonl")
 
@@ -37,6 +39,7 @@ explain flags:
   -depth int        how far back to walk; 0 prints the whole chain
 
 -log explains a recorded history, so -scenario and -seed do not apply with it.
+-file and -scenario both name the world to run, so they cannot be combined.
 `
 
 func main() {
@@ -57,6 +60,8 @@ func run(args []string, stdout, stderr io.Writer) error {
 		return runExplain(args[1:], stdout, stderr)
 	case "scenarios":
 		return runScenarios(args[1:], stdout)
+	case "version", "-version", "--version":
+		return runVersion(args[1:], stdout)
 	case "help", "-h", "-help", "--help":
 		fmt.Fprint(stdout, usage)
 		return nil
@@ -69,6 +74,7 @@ func runScenario(args []string, stdout, stderr io.Writer) error {
 	flags := flag.NewFlagSet("aegis run", flag.ContinueOnError)
 	flags.SetOutput(stderr)
 	name := flags.String("scenario", "node-crash", "scenario to run")
+	path := flags.String("file", "", "a scenario file to run instead of a built-in scenario")
 	seed := flags.Uint64("seed", 0, "seed for deterministic decisions")
 	format := flags.String("format", "jsonl", "output format: jsonl or table")
 	if err := flags.Parse(args); err != nil {
@@ -81,7 +87,7 @@ func runScenario(args []string, stdout, stderr io.Writer) error {
 		return fmt.Errorf("unexpected argument %q", flags.Arg(0))
 	}
 
-	spec, err := lookup(*name)
+	spec, err := chooseSpec(*name, *path, flags)
 	if err != nil {
 		return err
 	}
@@ -220,6 +226,34 @@ var runnable = []struct {
 	{name: "one-way-partition", build: scenario.OneWayPartition},
 	{name: "recovered-crash", build: scenario.RecoveredCrash},
 	{name: "lone-witness", build: scenario.LoneWitness},
+}
+
+// chooseSpec returns the world to run: the file if one was named, otherwise the
+// built-in scenario.
+//
+// Naming both is an error rather than a precedence rule. A reader who typed both
+// believed both did something, and silently running one of them would leave the
+// other in the command line looking like it had been honoured.
+func chooseSpec(name, path string, flags *flag.FlagSet) (scenario.Spec, error) {
+	if path == "" {
+		return lookup(name)
+	}
+	if wasSet(flags, "scenario") {
+		return scenario.Spec{}, errors.New("-file and -scenario both name the world to run; pass one of them")
+	}
+	return scenario.LoadFile(path)
+}
+
+// wasSet reports whether the caller named the flag, as opposed to leaving it at
+// its default.
+func wasSet(flags *flag.FlagSet, name string) bool {
+	set := false
+	flags.Visit(func(f *flag.Flag) {
+		if f.Name == name {
+			set = true
+		}
+	})
+	return set
 }
 
 // scenarioNames lists the runnable scenarios as a reader would type them.

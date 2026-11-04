@@ -11,6 +11,25 @@ var ErrInvalidEvent = errors.New("invalid event")
 // ErrInvalidCause identifies a causal reference that cannot be followed.
 var ErrInvalidCause = errors.New("invalid cause")
 
+// ErrUnsupportedSchema identifies a history written in a format this build does
+// not read. It is refused rather than guessed at: a log whose fields are
+// interpreted by the wrong rules decodes into events that look right and mean
+// something else.
+var ErrUnsupportedSchema = errors.New("unsupported log schema")
+
+// EventLogSchema names the format of a JSONL history.
+//
+// It is written once, on the event that opens the history, and refused
+// everywhere else. Repeating it on every line would let a file disagree with
+// itself about what it is — two halves of one log claiming different formats —
+// and the reader would have no rule for which line wins.
+//
+// The version changes when a consumer would have to change to keep reading: a
+// new field a reader must interpret, a meaning that moved, a kind that went
+// away. Adding an event kind nobody is required to handle does not, by itself,
+// change it.
+const EventLogSchema = "aegis.eventlog/v1"
+
 // Kind names a class of event in the recorded history. The vocabulary is
 // closed: an unknown string is rejected rather than written, so a typo cannot
 // produce a log that silently loses information.
@@ -110,12 +129,12 @@ const (
 // Event is one entry in the append-only history. It carries virtual time only:
 // no wall-clock field exists, because a wall-clock timestamp would make two
 // identical runs differ and replay untestable.
-//
-// Seq is assigned by the recorder. Node is the event's subject, Peer the
+// // Seq is assigned by the recorder. Node is the event's subject, Peer the
 // counterpart where one exists, Round the heartbeat round for message events,
 // Reason the machine-readable cause, Scenario the run's name on the opening and
-// closing events, Action the recovery decision an event belongs to, and Causes
-// the references that explain why it happened.
+// closing events, Schema the format of the file on the opening event alone,
+// Action the recovery decision an event belongs to, and Causes the references
+// that explain why it happened.
 type Event struct {
 	Seq      uint64   `json:"seq"`
 	At       Tick     `json:"at"`
@@ -125,12 +144,32 @@ type Event struct {
 	Round    uint64   `json:"round,omitempty"`
 	Reason   string   `json:"reason,omitempty"`
 	Scenario string   `json:"scenario,omitempty"`
+	Schema   string   `json:"schema,omitempty"`
 	Action   ActionID `json:"action,omitempty"`
 
 	// Causes names the events that produced this one, in strictly increasing
 	// order. The recorder rejects a reference that does not exist yet, so the
 	// history stays a graph that only points backwards.
 	Causes []Ref `json:"causes,omitempty"`
+}
+
+// WithSchema returns the event as a history would hold it, filling in the log
+// format on the event that opens one.
+//
+// Both recorders call it, so "what format is this file" is answered in one place
+// rather than at every site that opens a run. A caller that states a different
+// format is refused instead of overruled: either it meant a format this build
+// cannot produce, or it made a mistake that would otherwise reach a file.
+func WithSchema(ev Event) (Event, error) {
+	if ev.Kind != KindScenarioStarted || ev.Schema == EventLogSchema {
+		return ev, nil
+	}
+	if ev.Schema == "" {
+		ev.Schema = EventLogSchema
+		return ev, nil
+	}
+	return ev, fmt.Errorf("%w: history opens as %q, this build writes %q",
+		ErrUnsupportedSchema, ev.Schema, EventLogSchema)
 }
 
 // validateCauses checks the references an event carries.
@@ -165,12 +204,23 @@ func (e Event) Validate() error {
 	if err := e.validateCauses(); err != nil {
 		return err
 	}
+	// The schema is the opening event's business and nobody else's. A closed
+	// field on every line would be a field every writer has to remember, and the
+	// one writer that forgot would produce a file that still parses.
+	if e.Kind != KindScenarioStarted && e.Schema != "" {
+		return fmt.Errorf("%w: %s must not name a schema; only %s opens a history",
+			ErrInvalidEvent, e.Kind, KindScenarioStarted)
+	}
+
 	if e.Kind == KindScenarioStarted || e.Kind == KindScenarioFinished {
 		if e.Scenario == "" {
 			return fmt.Errorf("%w: %s requires a scenario name", ErrInvalidEvent, e.Kind)
 		}
 		if e.Node != "" || e.Peer != "" {
 			return fmt.Errorf("%w: %s must not name nodes", ErrInvalidEvent, e.Kind)
+		}
+		if e.Kind == KindScenarioStarted && e.Schema != EventLogSchema {
+			return fmt.Errorf("%w: history opens as %q, not %q", ErrUnsupportedSchema, e.Schema, EventLogSchema)
 		}
 		return nil
 	}

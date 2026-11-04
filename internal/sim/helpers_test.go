@@ -19,6 +19,14 @@ func (r *stubRecorder) Record(ev domain.Event) (domain.Ref, error) {
 	if r.err != nil {
 		return 0, r.err
 	}
+	// An event that opens a history carries the file's format, and the rule for
+	// that lives in one place so this double cannot hold a different one.
+	stamped, err := domain.WithSchema(ev)
+	if err != nil {
+		r.bad = append(r.bad, err)
+	} else {
+		ev = stamped
+	}
 	if err := ev.Validate(); err != nil {
 		r.bad = append(r.bad, err)
 	}

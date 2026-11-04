@@ -1,4 +1,4 @@
-{"seq":1,"at":0,"kind":"scenario_started","scenario":"lone-witness"}
+{"seq":1,"at":0,"kind":"scenario_started","scenario":"lone-witness","schema":"aegis.eventlog/v1"}
 {"seq":2,"at":0,"kind":"node_started","node":"A","causes":[1]}
 {"seq":3,"at":0,"kind":"node_started","node":"B","causes":[1]}
 {"seq":4,"at":100000000,"kind":"heartbeat_sent","node":"B","peer":"A","round":1,"causes":[3]}

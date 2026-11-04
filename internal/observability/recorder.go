@@ -55,6 +55,13 @@ func (r *Recorder) Record(ev domain.Event) (domain.Ref, error) {
 	if ev.Seq != 0 {
 		return 0, fmt.Errorf("%w: seq %d", ErrPreassignedSeq, ev.Seq)
 	}
+	// The format is part of the artifact this type produces, so it is filled in
+	// here rather than left to each of the many places that open a run.
+	schema, err := domain.WithSchema(ev)
+	if err != nil {
+		return 0, err
+	}
+	ev = schema
 	if err := ev.Validate(); err != nil {
 		return 0, err
 	}
@@ -94,6 +101,10 @@ func (r *Recorder) Event(ref domain.Ref) (domain.Event, bool) {
 // not match its position, is an error rather than a skipped line. A loader that
 // tolerates damage turns a corrupted artifact into a plausible one, and this file
 // is the artifact.
+//
+// The format is checked before anything else is believed. A file that does not
+// name the schema this build reads is refused whole, because the alternative is
+// decoding somebody else's fields into these ones and reporting success.
 func ReadJSONL(r io.Reader) ([]domain.Event, error) {
 	dec := json.NewDecoder(r)
 	var out []domain.Event
@@ -110,6 +121,17 @@ func ReadJSONL(r io.Reader) ([]domain.Event, error) {
 			return nil, fmt.Errorf("%w: position %d carries sequence %d", ErrDamagedLog, len(out)+1, ev.Seq)
 		}
 		out = append(out, ev)
+	}
+	if len(out) == 0 {
+		return nil, fmt.Errorf("%w: the log is empty", ErrDamagedLog)
+	}
+	if got := out[0].Schema; got != domain.EventLogSchema {
+		if got == "" {
+			return nil, fmt.Errorf("%w: the history names no schema; this build reads %q",
+				domain.ErrUnsupportedSchema, domain.EventLogSchema)
+		}
+		return nil, fmt.Errorf("%w: the history is %q; this build reads %q",
+			domain.ErrUnsupportedSchema, got, domain.EventLogSchema)
 	}
 	return out, nil
 }
