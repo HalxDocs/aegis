@@ -286,6 +286,8 @@ detector knows only the domain, so it has no way to read ground truth; the gate 
 handed to it, so it cannot ask the simulator anything; the causal explainer and the verifier know only the events,
 so they have no way to ask what really happened.
 
+[![Fund my work on FLOSSAfrica](https://flossafrica.com/badge.svg?theme=dark)](https://flossafrica.com/m/halxdocs?p=aegis)
+
 ## Contributing
 
 Setup, the four rules the project holds changes to, and what a change has to bring with it are in
