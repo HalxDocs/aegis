@@ -1,5 +1,5 @@
-// Command aegis runs one scenario and prints its event history, or explains
-// why one event in it happened.
+// Command aegis runs one scenario and prints its event history, explains why one
+// event in it happened, or lists the scenarios it can run.
 //
 // The table view and the explanation are both derived from the recorded events
 // after the run; neither is a second source of truth. JSONL is the canonical
@@ -21,6 +21,7 @@ import (
 
 const usage = `usage: aegis run [flags]
        aegis explain -ref <seq> [flags]
+       aegis scenarios
 
 run flags:
   -scenario string  scenario to run (default "node-crash")
@@ -54,6 +55,8 @@ func run(args []string, stdout, stderr io.Writer) error {
 		return runScenario(args[1:], stdout, stderr)
 	case "explain":
 		return runExplain(args[1:], stdout, stderr)
+	case "scenarios":
+		return runScenarios(args[1:], stdout)
 	case "help", "-h", "-help", "--help":
 		fmt.Fprint(stdout, usage)
 		return nil
@@ -95,6 +98,24 @@ func runScenario(args []string, stdout, stderr io.Writer) error {
 	default:
 		return fmt.Errorf("unknown format %q (available: jsonl, table)", *format)
 	}
+}
+
+// runScenarios prints the scenarios this build can run, one per line.
+//
+// It exists so that the set is part of the command's interface rather than a
+// detail of its source: a consumer that needs to know what exists asks the
+// binary, instead of parsing the table above out of main.go and quietly holding
+// an answer that a rename there would make wrong.
+func runScenarios(args []string, stdout io.Writer) error {
+	if len(args) > 0 {
+		return fmt.Errorf("scenarios takes no arguments, got %q", args[0])
+	}
+	for _, name := range scenarioNames() {
+		if _, err := fmt.Fprintln(stdout, name); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // runExplain runs a scenario and prints why one of its events happened.
