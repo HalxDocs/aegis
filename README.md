@@ -167,10 +167,15 @@ go run ./cmd/aegis run --scenario node-crash --seed 7            # seed is an in
 go run ./cmd/aegis explain -scenario one-way-partition -ref 61   # the reasons behind one event
 go run ./cmd/aegis run --format jsonl > run.jsonl               # also: explain a log from disk
 go run ./cmd/aegis explain -log run.jsonl -ref 14
+go run ./cmd/aegis scenarios                                   # what can run, one name per line
 ```
 
 The JSONL log is the canonical artifact: one event per line, virtual timestamps only, sequence numbers assigned by
 the recorder. The table view is rendered from those events and is never a second source of truth.
+
+`aegis scenarios` is that same idea applied to the list itself: it prints the scenarios this binary can run, so a
+tool that needs to know — the explainer page's parity check, a script, a person — asks the binary instead of
+parsing `main.go`. It is an interface, not decoration; adding a scenario means it shows up there too.
 
 ## Layout
 

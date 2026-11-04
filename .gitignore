@@ -8,6 +8,7 @@ coverage.*
 
 # Local tool and editor state. Nothing in here belongs in the repository.
 .freebuff/
+.cloud-attachments/
 .idea/
 .vscode/
 .DS_Store
