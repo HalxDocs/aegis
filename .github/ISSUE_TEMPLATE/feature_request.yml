@@ -1,0 +1,60 @@
+name: Feature request
+description: A failure the lab cannot currently express, or a question it cannot answer.
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This project says no to features on purpose: the README lists what is
+        deliberately absent, and a half-modelled failure is worse than an absent
+        one. So the strongest request names the failure and what the log should
+        say about it.
+
+  - type: textarea
+    id: failure
+    attributes:
+      label: What failure, or what question
+      description: Describe the situation in the world, not the API you want.
+      placeholder: A node that restarts, crashes again before its peers trust it, and loops.
+    validations:
+      required: true
+
+  - type: textarea
+    id: log
+    attributes:
+      label: What the log should show
+      description: Which events, in what order, and what a reader should be able to conclude.
+      placeholder: |
+        node_crashed, node_restarted, node_crashed again, and a refusal rather than a
+        second restart, with the loop visible in the causes.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: kind
+    attributes:
+      label: What kind of change is this
+      options:
+        - A new scenario
+        - A new event or a change to one
+        - A new action recovery can take
+        - A new command or flag
+        - Documentation or tooling
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: What you tried instead
+      description: A scenario file, an existing scenario, a workaround, or nothing.
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I read the "deliberately absent" list in the README and this is not on it.
+          required: true

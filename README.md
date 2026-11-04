@@ -286,6 +286,15 @@ detector knows only the domain, so it has no way to read ground truth; the gate 
 handed to it, so it cannot ask the simulator anything; the causal explainer and the verifier know only the events,
 so they have no way to ask what really happened.
 
+## Contributing
+
+Setup, the four rules the project holds changes to, and what a change has to bring with it are in
+[CONTRIBUTING.md](CONTRIBUTING.md). Participation is covered by the [Code of Conduct](CODE_OF_CONDUCT.md), and a
+security report goes through [SECURITY.md](SECURITY.md) rather than a public issue.
+
+The explainer page is its own repository, [HalxDocs/aegis-lab](https://github.com/HalxDocs/aegis-lab), and bugs in the
+page belong there.
+
 ## Licence
 
 MIT. See [LICENSE](LICENSE).

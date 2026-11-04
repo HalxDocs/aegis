@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: The explainer page
+    url: https://github.com/HalxDocs/aegis-lab/issues
+    about: The live page at aegis-labx.vercel.app is its own repository. Bugs in the page, its TypeScript port, or its parity fixtures belong there.
+  - name: How to contribute
+    url: https://github.com/HalxDocs/aegis/blob/main/CONTRIBUTING.md
+    about: Setup, the four rules, and what a change has to bring with it.
+  - name: Security issue
+    url: https://github.com/HalxDocs/aegis/security/advisories/new
+    about: Report privately. Please do not open a public issue for a vulnerability.

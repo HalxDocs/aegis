@@ -1,0 +1,76 @@
+name: Bug report
+description: Something runs, logs, or parses incorrectly.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. Two things make a bug here vastly easier to find:
+        the exact command, and the log it produced. The log is the artifact —
+        the table view and the explanations are derived from it.
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: The behaviour, not yet the explanation.
+      placeholder: A suspicion is raised at 355 ms in a run whose timeout is 350 ms.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected instead
+      placeholder: The last heartbeat arrived at 220 ms, so 355 ms is correct and the bug is mine.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: How to reproduce
+      description: The commands, in order. A scenario file or a log works too.
+      render: shell
+      placeholder: |
+        go run ./cmd/aegis run --scenario one-way-partition --format table
+    validations:
+      required: true
+
+  - type: textarea
+    id: output
+    attributes:
+      label: Output
+      description: Paste what it printed. JSONL is preferred over the table view.
+      render: shell
+    validations:
+      required: false
+
+  - type: input
+    id: version
+    attributes:
+      label: aegis version
+      description: The output of `aegis version` (or `go run ./cmd/aegis version`).
+      placeholder: |
+        aegis v0.4.0
+        schema aegis.eventlog/v1
+    validations:
+      required: true
+
+  - type: input
+    id: go
+    attributes:
+      label: Go version and OS
+      placeholder: go1.25.0 linux/amd64
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I ran `make check` (or `go test ./...`) and it passed.
+          required: false
+        - label: This is a bug, not a question about the design. Design questions belong in a discussion or an issue of their own.
+          required: true
