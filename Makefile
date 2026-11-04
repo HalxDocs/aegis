@@ -6,7 +6,7 @@ REF ?= 14
 # out this repository alone, so it is a separate target with no lab to run.
 LAB ?= ../aegis-lab
 
-.PHONY: all build fmt fmt-check vet test race check check-all lab-check cover replay demo explain clean
+.PHONY: all build fmt fmt-check vet test race check check-all lab-check cover replay demo explain clean hooks
 
 all: check
 
@@ -56,6 +56,15 @@ lab-check:
 .NOTPARALLEL: check-all
 
 check-all: check lab-check
+
+# GitHub cannot gate a direct push to main with required status checks: it
+# rejects the push with GH006, since the checks only exist after the push they
+# would reject. The gate therefore runs before the push leaves the machine.
+# Optional, because it writes to your git config; `git push --no-verify` skips
+# it when the push is not about code.
+hooks:
+	git config core.hooksPath hooks
+	@echo "pre-push now runs make check-all (bypass: git push --no-verify)"
 
 # Two runs of every scenario must produce identical bytes. Comparing parsed
 # events would miss reordering, which is exactly the defect this target exists to

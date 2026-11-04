@@ -173,6 +173,11 @@ go run ./cmd/aegis scenarios                                   # what can run, o
 The JSONL log is the canonical artifact: one event per line, virtual timestamps only, sequence numbers assigned by
 the recorder. The table view is rendered from those events and is never a second source of truth.
 
+`make hooks` points `core.hooksPath` at `hooks/`, where a pre-push hook runs `make check-all` (or `make check` if
+the page is not checked out) before anything leaves the machine. Branch protection cannot do this: requiring status
+checks rejects a direct push to `main` with `GH006`, because the checks only exist after the push they reject.
+`git push --no-verify` skips it deliberately.
+
 `aegis scenarios` is that same idea applied to the list itself: it prints the scenarios this binary can run, so a
 tool that needs to know — the explainer page's parity check, a script, a person — asks the binary instead of
 parsing `main.go`. It is an interface, not decoration; adding a scenario means it shows up there too.

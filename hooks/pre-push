@@ -1,0 +1,17 @@
+#!/bin/sh
+# Runs before anything leaves the machine.
+#
+# Branch protection cannot do this job: "require status checks" rejects a push
+# to main with GH006, because the checks only exist after the push they would
+# reject. So the gate runs here, where the commit is still local and a failure
+# costs nothing. Bypass deliberately with `git push --no-verify` when the push
+# is not about code (a tag, a revert you are about to fix).
+set -e
+
+if [ -d "${LAB:-../aegis-lab}" ]; then
+	printf 'pre-push: make check-all (also checks the page in %s)\n' "${LAB:-../aegis-lab}"
+	exec make check-all
+fi
+
+printf 'pre-push: make check (no explainer page checked out beside this repo)\n'
+exec make check
