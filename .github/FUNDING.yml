@@ -1,0 +1,6 @@
+# The funding ask lives here rather than in the README: GitHub renders this as a
+# Sponsor button on the repository itself, which reaches people looking at the
+# code, and it keeps the README free of an image that says nothing about the
+# software.
+github: HalxDocs
+custom: ["https://flossafrica.com/m/halxdocs?p=aegis"]
